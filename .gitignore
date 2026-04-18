@@ -1,0 +1,38 @@
+# Secrets — never commit
+.env
+.env.*
+*.key
+*.pem
+keys.ini
+secrets.yaml
+secrets.json
+credentials*
+*api_key*
+*apikey*
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+.ipynb_checkpoints/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Data — raw pulls stay local unless explicitly checked in under research/
+research/data/
+research/cache/
+*.parquet
+*.csv
+*.feather
+*.db
+*.sqlite
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+*.swp
