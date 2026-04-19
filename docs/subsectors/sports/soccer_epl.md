@@ -5,22 +5,23 @@ _Auto-generated. Curated notes (KEEP block) preserved across runs._
 ## Summary
 
 - Series: **3** (3 with open markets)
-- Open markets: **55** (20 contested)
-- Total 24h volume: **$86,946**
-- Total open interest: **8,227,316**
-- Top-OI mean spread (median across series): **2.0 cents**
+- Open markets: **55** (19 contested)
+- Total 24h volume: **$94,253**
+- Total open interest: **8,233,099**
+- Top-OI mean spread (median across series): **2.3 cents**
 - **MM profile: HFT-saturated**
 
 ## Book depth (from comprehensive scan)
 
 - Markets sampled: **20**
 - Median spread: **2.0c**
-- Median TOB bid / ask size: **178 / 130** contracts
-- Median cumulative depth within 5c of mid — bid: **3494** / ask: **3874** contracts
-- Median cumulative depth within 10c of mid — bid: **4655** / ask: **4426** contracts
-- Mean trades per market (last 3000): **513**
-- Mean informed-signal proxy: **0.000** (sign(trade) * forward cent-move; >0 = toxic)
-- Mean abs consecutive-trade move: **0.00c**
+- Median TOB bid / ask size: **178 / 164** contracts
+- Median depth within 5c of best bid / ask — **3765 / 4090** contracts
+- Median depth within 10c of best bid / ask — **4165 / 4433** contracts
+- Median depth within 5c of midpoint — bid: **3052** / ask: **3907** (useful for tight-spread markets only)
+- Mean trades per market (last 3000): **302**
+- Mean informed-signal proxy: **-2.014** (sign(trade) * forward cent-move; >0 = toxic)
+- Mean abs consecutive-trade move: **2.38c**
 
 ## Informed flow by time-to-expiry
 
@@ -30,36 +31,36 @@ Larger `mean_abs_move` = more price movement between consecutive trades.
 
 | TTE bucket | n_trades | mean_abs_move_c | informed_signal_c | p95_abs_move_c | mean_size |
 |---|---:|---:|---:|---:|---:|
-| 7-30d | 136 | 0.00 | 0.000 | 0.00 | 0.0 |
-| 30d+ | 10116 | 0.00 | 0.000 | 0.00 | 0.0 |
+| 7-30d | 172 | 1.19 | -1.006 | 11.00 | 53.0 |
+| 30d+ | 5864 | 0.92 | -0.357 | 3.00 | 133.7 |
 
 ## Top markets (by OI)
 
-| ticker | subtitle | mid | spread_c | tob_bid | tob_ask | depth_5c_bid | depth_5c_ask | oi | vol_24h | tte_now |
-|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---|
-| KXPREMIERLEAGUE-26-MCI | Man City | 40c | 1.0c | 42299 | 12 | 102623 | 125539 | 1464752 | $62217 | 30d+ |
-| KXPREMIERLEAGUE-26-ARS | Arsenal | 60c | 1.0c | 6000 | 66777 | 113472 | 295536 | 1068685 | $19212 | 30d+ |
-| KXEPLTOP4-26-CHE | Chelsea | 8c | 1.0c | 16 | 48 | 16 | 336 | 152968 | $1034 | 30d+ |
-| KXEPLTOP4-26-MUN | Man Utd | 88c | 2.0c | 44 | 44 | 1239 | 6407 | 95630 | $2680 | 30d+ |
-| KXEPLTOP4-26-LFC | Liverpool | 45c | 2.0c | 9 | 201 | 157 | 254 | 85626 | $158 | 30d+ |
-| KXEPLTOP4-26-AVL | Aston Villa | 66c | 3.0c | 24 | 24 | 43 | 307 | 36368 | $987 | 30d+ |
-| KXEPLBTTS-26APR19MCIARS | Both Teams To Score | 52c | 2.0c | 275 | 420 | 9950 | 14856 | 1920 | $1191 | 7-30d |
-| KXEPLBTTS-26APR19EVELFC | Both Teams To Score | 57c | 1.0c | 415 | 310 | 13447 | 15077 | 654 | $654 | 7-30d |
-| KXEPLBTTS-26APR22BOULEE | Both Teams To Score | 58c | 3.0c | 10 | 111 | 4152 | 3288 | 109 | $90 | 7-30d |
-| KXEPLBTTS-26APR19AVLSUN | Both Teams To Score | 50c | 1.0c | 2027 | 182 | 13844 | 14461 | 34 | $34 | 7-30d |
-| KXEPLBTTS-26APR19NFOBUR | Both Teams To Score | 51c | 2.0c | 1164 | 158 | 14141 | 15382 | 6 | $6 | 7-30d |
-| KXEPLBTTS-26APR22BURMCI | Both Teams To Score | 52c | 4.0c | 10 | 10 | 4018 | 3796 | 1 | $1 | 7-30d |
-| KXEPLBTTS-26APR20CRYWHU | Both Teams To Score | 57c | 2.0c | 632 | 1226 | 3806 | 4055 | 1 | $0 | 7-30d |
-| KXEPLBTTS-26APR25FULAVL | Both Teams To Score | 58c | 7.0c | 110 | 134 | 220 | 544 | 0 | $0 | 7-30d |
-| KXEPLBTTS-26APR25LFCCRY | Both Teams To Score | 56c | 6.0c | 110 | 111 | 420 | 521 | 0 | $0 | 7-30d |
+| ticker | subtitle | mid | spread_c | tob_bid | tob_ask | d5c_bid | d5c_ask | d10c_bid | d10c_ask | oi | vol_24h | tte_now |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|
+| KXPREMIERLEAGUE-26-MCI | Man City | 40c | 1.0c | 2198 | 3236 | 94387 | 199717 | 161053 | 199867 | 1464581 | $62323 | 30d+ |
+| KXPREMIERLEAGUE-26-ARS | Arsenal | 60c | 1.0c | 6000 | 66024 | 166717 | 288571 | 166993 | 288571 | 1068814 | $19965 | 30d+ |
+| KXEPLTOP4-26-CHE | Chelsea | 8c | 1.0c | 16 | 48 | 4958 | 136 | 7876 | 827 | 152968 | $855 | 30d+ |
+| KXEPLTOP4-26-MUN | Man Utd | 88c | 3.0c | 5 | 88 | 1788 | 6351 | 2936 | 13693 | 95630 | $2680 | 30d+ |
+| KXEPLTOP4-26-LFC | Liverpool | 45c | 2.0c | 9 | 22 | 54 | 75 | 1025 | 575 | 85626 | $158 | 30d+ |
+| KXEPLTOP4-26-AVL | Aston Villa | 64c | 2.0c | 2 | 20 | 22 | 188 | 564 | 212 | 36373 | $977 | 30d+ |
+| KXEPLBTTS-26APR19MCIARS | Both Teams To Score | 52c | 1.0c | 335 | 655 | 9137 | 15533 | 15337 | 15833 | 2700 | $1960 | 7-30d |
+| KXEPLBTTS-26APR19EVELFC | Both Teams To Score | 58c | 2.0c | 275 | 5862 | 15681 | 15626 | 16281 | 15926 | 1771 | $1706 | 7-30d |
+| KXEPLBTTS-26APR22BURMCI | Both Teams To Score | 52c | 4.0c | 10 | 24 | 4928 | 4010 | 5228 | 4310 | 898 | $898 | 7-30d |
+| KXEPLBTTS-26APR19AVLSUN | Both Teams To Score | 52c | 1.0c | 275 | 155 | 15737 | 17071 | 16837 | 17371 | 241 | $241 | 7-30d |
+| KXEPLBTTS-26APR22BOULEE | Both Teams To Score | 58c | 3.0c | 10 | 131 | 4952 | 3408 | 4952 | 4008 | 109 | $90 | 7-30d |
+| KXEPLBTTS-26APR19NFOBUR | Both Teams To Score | 51c | 2.0c | 769 | 2425 | 15374 | 15714 | 15974 | 16014 | 30 | $30 | 7-30d |
+| KXEPLBTTS-26APR20CRYWHU | Both Teams To Score | 57c | 2.0c | 632 | 1226 | 3906 | 4255 | 4406 | 4555 | 1 | $0 | 7-30d |
+| KXEPLBTTS-26APR25FULAVL | Both Teams To Score | 58c | 7.0c | 110 | 86 | 1120 | 906 | 1150 | 1216 | 0 | $0 | 7-30d |
+| KXEPLBTTS-26APR25LFCCRY | Both Teams To Score | 56c | 6.0c | 110 | 179 | 1120 | 989 | 1120 | 1309 | 0 | $0 | 7-30d |
 
 ## Top series by OI
 
 | series | title | freq | n_mkts | n_con | 24h_vol | total_oi | top_oi_spread |
 |---|---|---|---:|---:|---:|---:|---:|
-| KXPREMIERLEAGUE | PREMIER LEAGUE | annual | 20 | 2 | $81,034 | 7,497,928 | 1.0c |
-| KXEPLTOP4 | EPL top 4 teams | annual | 20 | 3 | $4,967 | 727,497 | 2.3c |
-| KXEPLBTTS | EPL Both Teams to Score | custom | 15 | 15 | $945 | 1,890 | 2.0c |
+| KXPREMIERLEAGUE | PREMIER LEAGUE | annual | 20 | 2 | $84,939 | 7,500,185 | 1.0c |
+| KXEPLTOP4 | EPL top 4 teams | annual | 20 | 3 | $4,670 | 727,521 | 2.3c |
+| KXEPLBTTS | EPL Both Teams to Score | custom | 15 | 14 | $4,644 | 5,393 | 2.3c |
 
 ## Curated notes
 

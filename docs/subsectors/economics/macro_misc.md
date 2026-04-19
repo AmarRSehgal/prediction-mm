@@ -5,22 +5,23 @@ _Auto-generated. Curated notes (KEEP block) preserved across runs._
 ## Summary
 
 - Series: **27** (27 with open markets)
-- Open markets: **723** (284 contested)
-- Total 24h volume: **$26,944**
-- Total open interest: **1,169,188**
+- Open markets: **723** (285 contested)
+- Total 24h volume: **$27,850**
+- Total open interest: **1,169,880**
 - Top-OI mean spread (median across series): **7.0 cents**
-- **MM profile: Moderate (mixed)**
+- **MM profile: Toxic flow**
 
 ## Book depth (from comprehensive scan)
 
 - Markets sampled: **200**
-- Median spread: **5.5c**
+- Median spread: **5.0c**
 - Median TOB bid / ask size: **200 / 200** contracts
-- Median cumulative depth within 5c of mid — bid: **260** / ask: **260** contracts
-- Median cumulative depth within 10c of mid — bid: **522** / ask: **346** contracts
-- Mean trades per market (last 3000): **104**
-- Mean informed-signal proxy: **0.000** (sign(trade) * forward cent-move; >0 = toxic)
-- Mean abs consecutive-trade move: **0.00c**
+- Median depth within 5c of best bid / ask — **364 / 346** contracts
+- Median depth within 10c of best bid / ask — **772 / 370** contracts
+- Median depth within 5c of midpoint — bid: **260** / ask: **260** (useful for tight-spread markets only)
+- Mean trades per market (last 3000): **95**
+- Mean informed-signal proxy: **-1.166** (sign(trade) * forward cent-move; >0 = toxic)
+- Mean abs consecutive-trade move: **3.69c**
 
 ## Informed flow by time-to-expiry
 
@@ -30,45 +31,45 @@ Larger `mean_abs_move` = more price movement between consecutive trades.
 
 | TTE bucket | n_trades | mean_abs_move_c | informed_signal_c | p95_abs_move_c | mean_size |
 |---|---:|---:|---:|---:|---:|
-| 1-3d | 28 | 0.00 | 0.000 | 0.00 | 0.0 |
-| 3-7d | 160 | 0.00 | 0.000 | 0.00 | 0.0 |
-| 7-30d | 4628 | 0.00 | 0.000 | 0.00 | 0.0 |
-| 30d+ | 15964 | 0.00 | 0.000 | 0.00 | 0.0 |
+| 1-3d | 28 | 6.18 | -3.182 | 29.05 | 91.8 |
+| 3-7d | 155 | 2.68 | -1.176 | 11.95 | 39.1 |
+| 7-30d | 4035 | 1.22 | -0.383 | 5.00 | 46.0 |
+| 30d+ | 14770 | 3.10 | -0.772 | 12.30 | 166.3 |
 
 ## Top markets (by OI)
 
-| ticker | subtitle | mid | spread_c | tob_bid | tob_ask | depth_5c_bid | depth_5c_ask | oi | vol_24h | tte_now |
-|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---|
-| KXCAWEALTHTAX-26 | In 2026 | 36c | 5.0c | 42 | 13 | 1542 | 67 | 122855 | $487 | 30d+ |
-| KXLCPIMAXYOY-27-P4.5 | At least 4.5% | 29c | 6.0c | 10 | 19 | 28 | 1019 | 40738 | $538 | 30d+ |
-| KXLCPIMAXYOY-27-P4 | At least 4% | 45c | 1.0c | 3 | 59 | 1273 | 1059 | 38094 | $197 | 30d+ |
-| KXLCPIMAXYOY-27-P3.5 | At least 3.5% | 95c | 2.9c | 1000 | 479 | 3152 | 2030 | 34760 | $0 | 30d+ |
-| KXECONSTATCPICORE-26MAY-T-0.2 | Exactly -0.2% | 11c | 6.0c | 20 | 14 | 20 | 411 | 30368 | $0 | 30d+ |
-| KXCPIYOY-26APR-T3.7 | 3.7 | 21c | 6.0c | 1000 | 10 | 2200 | 1010 | 26567 | $187 | 7-30d |
-| KXECONSTATCPIYOY-26MAY-T3.3 | Exactly 3.3% | 16c | 5.0c | 222 | 209 | 5222 | 346 | 24425 | $149 | 30d+ |
-| KXMUSKWEALTH-27-900 | More than $900 Billion | 84c | 5.0c | 41 | 500 | 641 | 654 | 24378 | $0 | 30d+ |
-| KXLCPIMAXYOY-27-P5 | At least 5% | 20c | 4.9c | 17 | 329 | 1017 | 2338 | 23376 | $1400 | 30d+ |
-| KXCPIYOY-26APR-T3.6 | 3.6 | 37c | 2.0c | 1000 | 5 | 2000 | 4782 | 20931 | $342 | 7-30d |
-| KXMUSKWEALTH-27-1000 | More than $1 trillion | 80c | 1.0c | 54 | 510 | 554 | 510 | 15687 | $0 | 30d+ |
-| KXJPMOMINF-26APR17-T-0.1 | Above -0.1% | 31c | 60.0c | 10 | 26 | 0 | 0 | 12243 | $0 | 3-7d |
-| KXCPIYOY-26APR-T3.5 | 3.5 | 70c | 1.0c | 1330 | 75 | 2597 | 4548 | 10973 | $155 | 7-30d |
-| KXUSFUND-27 | Before 2027 | 24c | 3.0c | 295 | 1185 | 443 | 1359 | 10783 | $0 | 30d+ |
-| KXCPIYOY-26APR-T3.8 | 3.8 | 12c | 3.0c | 74 | 1017 | 74 | 1017 | 10557 | $400 | 7-30d |
+| ticker | subtitle | mid | spread_c | tob_bid | tob_ask | d5c_bid | d5c_ask | d10c_bid | d10c_ask | oi | vol_24h | tte_now |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|
+| KXCAWEALTHTAX-26 | In 2026 | 36c | 5.0c | 12 | 26 | 1523 | 1317 | 1640 | 1428 | 122855 | $501 | 30d+ |
+| KXLCPIMAXYOY-27-P4.5 | At least 4.5% | 32c | 10.0c | 10 | 9 | 365 | 1332 | 365 | 2490 | 40760 | $560 | 30d+ |
+| KXLCPIMAXYOY-27-P4 | At least 4% | 50c | 6.0c | 33 | 34 | 636 | 1367 | 712 | 1367 | 39019 | $1172 | 30d+ |
+| KXLCPIMAXYOY-27-P3.5 | At least 3.5% | 95c | 2.4c | 333 | 333 | 4985 | 2478 | 6600 | 2478 | 34760 | $0 | 30d+ |
+| KXECONSTATCPICORE-26MAY-T-0.2 | Exactly -0.2% | 11c | 5.0c | 20 | 14 | 1525 | 308 | 9174 | 328 | 30368 | $0 | 30d+ |
+| KXCPIYOY-26APR-T3.7 | 3.7 | 24c | 1.0c | 107 | 1000 | 212 | 1000 | 7412 | 1119 | 26575 | $195 | 7-30d |
+| KXECONSTATCPIYOY-26MAY-T3.3 | Exactly 3.3% | 15c | 3.0c | 222 | 200 | 5222 | 339 | 5675 | 339 | 24425 | $149 | 30d+ |
+| KXMUSKWEALTH-27-900 | More than $900 Billion | 84c | 2.0c | 522 | 509 | 641 | 559 | 960 | 760 | 23759 | $619 | 30d+ |
+| KXLCPIMAXYOY-27-P5 | At least 5% | 21c | 2.8c | 17 | 13 | 350 | 1684 | 914 | 1684 | 23576 | $1600 | 30d+ |
+| KXCPIYOY-26APR-T3.6 | 3.6 | 37c | 2.0c | 1000 | 5 | 2000 | 4632 | 2000 | 4632 | 20931 | $442 | 7-30d |
+| KXMUSKWEALTH-27-1000 | More than $1 trillion | 80c | 2.0c | 526 | 511 | 526 | 511 | 526 | 511 | 15687 | $47 | 30d+ |
+| KXCPIYOY-26APR-T3.5 | 3.5 | 70c | 2.0c | 1335 | 4479 | 2602 | 4479 | 2702 | 4479 | 10974 | $156 | 7-30d |
+| KXUSFUND-27 | Before 2027 | 24c | 3.0c | 295 | 1185 | 1296 | 1409 | 2394 | 1559 | 10783 | $0 | 30d+ |
+| KXCPIYOY-26APR-T3.8 | 3.8 | 11c | 5.0c | 47 | 17 | 2397 | 1017 | 2551 | 1047 | 10560 | $191 | 7-30d |
+| KXMUSKWEALTH-27-1200 | More than  $1.2 trillion | 49c | 2.0c | 509 | 522 | 509 | 1034 | 509 | 1034 | 9156 | $0 | 30d+ |
 
 ## Top series by OI
 
 | series | title | freq | n_mkts | n_con | 24h_vol | total_oi | top_oi_spread |
 |---|---|---|---:|---:|---:|---:|---:|
-| KXECONSTATCPIYOY | year over year inflation | custom | 134 | 28 | $6,027 | 410,266 | 3.0c |
-| KXLCPIMAXYOY | Inflation surge this year | one_off | 7 | 3 | $2,274 | 149,774 | 3.9c |
-| KXCPIYOY | Inflation | monthly | 56 | 24 | $2,292 | 141,893 | 3.3c |
-| KXCAWEALTHTAX | Will the California billionaire wealth t | one_off | 1 | 1 | $350 | 123,030 | 4.0c |
-| KXMUSKWEALTH | Musk wealth | custom | 6 | 6 | $24 | 68,224 | 2.7c |
+| KXECONSTATCPIYOY | year over year inflation | custom | 134 | 29 | $3,853 | 410,276 | 2.3c |
+| KXLCPIMAXYOY | Inflation surge this year | one_off | 7 | 3 | $3,432 | 150,920 | 6.9c |
+| KXCPIYOY | Inflation | monthly | 56 | 24 | $2,320 | 142,024 | 1.7c |
+| KXCAWEALTHTAX | Will the California billionaire wealth t | one_off | 1 | 1 | $501 | 122,855 | 5.0c |
+| KXMUSKWEALTH | Musk wealth | custom | 6 | 6 | $684 | 67,605 | 2.0c |
 | KXECONSTATCPICORE | month over month core inflation | custom | 69 | 27 | $0 | 51,352 | 4.3c |
-| KXJPMOMINF | Japan inflation MoM in [month] | monthly | 9 | 5 | $25 | 35,397 | 48.0c |
-| KXECONSTATCPI | month over month inflation | custom | 76 | 35 | $486 | 31,909 | 3.0c |
+| KXJPMOMINF | Japan inflation MoM in [month] | monthly | 9 | 5 | $25 | 35,397 | 46.0c |
+| KXECONSTATCPI | month over month inflation | custom | 76 | 35 | $2,581 | 32,083 | 4.3c |
 | KXCPICOREYOY | Core inflation | monthly | 30 | 9 | $864 | 24,581 | 5.0c |
-| KXPCECORE | US Core PCE inflation | monthly | 45 | 25 | $2,778 | 22,095 | 7.3c |
+| KXPCECORE | US Core PCE inflation | monthly | 45 | 25 | $2,945 | 22,115 | 8.3c |
 
 ## Curated notes
 

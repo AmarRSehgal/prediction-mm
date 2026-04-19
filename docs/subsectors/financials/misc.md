@@ -9,18 +9,19 @@ _Auto-generated. Curated notes (KEEP block) preserved across runs._
 - Total 24h volume: **$36**
 - Total open interest: **10,186**
 - Top-OI mean spread (median across series): **3.5 cents**
-- **MM profile: Moderate (mixed)**
+- **MM profile: Toxic flow**
 
 ## Book depth (from comprehensive scan)
 
 - Markets sampled: **2**
 - Median spread: **3.5c**
 - Median TOB bid / ask size: **22 / 15** contracts
-- Median cumulative depth within 5c of mid — bid: **630** / ask: **61** contracts
-- Median cumulative depth within 10c of mid — bid: **631** / ask: **564** contracts
+- Median depth within 5c of best bid / ask — **630 / 318** contracts
+- Median depth within 10c of best bid / ask — **631 / 568** contracts
+- Median depth within 5c of midpoint — bid: **630** / ask: **65** (useful for tight-spread markets only)
 - Mean trades per market (last 3000): **614**
-- Mean informed-signal proxy: **0.000** (sign(trade) * forward cent-move; >0 = toxic)
-- Mean abs consecutive-trade move: **0.00c**
+- Mean informed-signal proxy: **-0.947** (sign(trade) * forward cent-move; >0 = toxic)
+- Mean abs consecutive-trade move: **1.90c**
 
 ## Informed flow by time-to-expiry
 
@@ -30,14 +31,14 @@ Larger `mean_abs_move` = more price movement between consecutive trades.
 
 | TTE bucket | n_trades | mean_abs_move_c | informed_signal_c | p95_abs_move_c | mean_size |
 |---|---:|---:|---:|---:|---:|
-| 30d+ | 1227 | 0.00 | 0.000 | 0.00 | 0.0 |
+| 30d+ | 1227 | 1.89 | -0.956 | 5.00 | 12.5 |
 
 ## Top markets (by OI)
 
-| ticker | subtitle | mid | spread_c | tob_bid | tob_ask | depth_5c_bid | depth_5c_ask | oi | vol_24h | tte_now |
-|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---|
-| KXPRICEINCREASEAZICEDTEA-26 | anything greater than 0% | 18c | 3.0c | 43 | 28 | 760 | 118 | 5293 | $9 | 30d+ |
-| KXPRICEINCREASEAPPLEMUSIC-26 | Before 2027 | 35c | 4.0c | 1 | 1 | 501 | 4 | 4893 | $27 | 30d+ |
+| ticker | subtitle | mid | spread_c | tob_bid | tob_ask | d5c_bid | d5c_ask | d10c_bid | d10c_ask | oi | vol_24h | tte_now |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|
+| KXPRICEINCREASEAZICEDTEA-26 | anything greater than 0% | 18c | 3.0c | 43 | 28 | 760 | 618 | 762 | 618 | 5293 | $9 | 30d+ |
+| KXPRICEINCREASEAPPLEMUSIC-26 | Before 2027 | 35c | 4.0c | 1 | 1 | 501 | 18 | 501 | 518 | 4893 | $27 | 30d+ |
 
 ## Top series by OI
 

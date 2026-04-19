@@ -6,8 +6,8 @@ _Auto-generated. Curated notes (KEEP block) preserved across runs._
 
 - Series: **9** (9 with open markets)
 - Open markets: **156** (92 contested)
-- Total 24h volume: **$13,308**
-- Total open interest: **220,863**
+- Total 24h volume: **$17,727**
+- Total open interest: **223,336**
 - Top-OI mean spread (median across series): **9.5 cents**
 - **MM profile: Niche opportunity**
 
@@ -16,11 +16,12 @@ _Auto-generated. Curated notes (KEEP block) preserved across runs._
 - Markets sampled: **110**
 - Median spread: **9.0c**
 - Median TOB bid / ask size: **200 / 200** contracts
-- Median cumulative depth within 5c of mid — bid: **200** / ask: **200** contracts
-- Median cumulative depth within 10c of mid — bid: **200** / ask: **216** contracts
-- Mean trades per market (last 3000): **121**
-- Mean informed-signal proxy: **0.000** (sign(trade) * forward cent-move; >0 = toxic)
-- Mean abs consecutive-trade move: **0.00c**
+- Median depth within 5c of best bid / ask — **201 / 280** contracts
+- Median depth within 10c of best bid / ask — **202 / 324** contracts
+- Median depth within 5c of midpoint — bid: **200** / ask: **200** (useful for tight-spread markets only)
+- Mean trades per market (last 3000): **115**
+- Mean informed-signal proxy: **-0.960** (sign(trade) * forward cent-move; >0 = toxic)
+- Mean abs consecutive-trade move: **3.70c**
 
 ## Informed flow by time-to-expiry
 
@@ -30,35 +31,35 @@ Larger `mean_abs_move` = more price movement between consecutive trades.
 
 | TTE bucket | n_trades | mean_abs_move_c | informed_signal_c | p95_abs_move_c | mean_size |
 |---|---:|---:|---:|---:|---:|
-| 7-30d | 2107 | 0.00 | 0.000 | 0.00 | 0.0 |
-| 30d+ | 11255 | 0.00 | 0.000 | 0.00 | 0.0 |
+| 7-30d | 2115 | 1.37 | -0.328 | 5.00 | 60.7 |
+| 30d+ | 10542 | 2.73 | -1.158 | 10.00 | 19.5 |
 
 ## Top markets (by OI)
 
-| ticker | subtitle | mid | spread_c | tob_bid | tob_ask | depth_5c_bid | depth_5c_ask | oi | vol_24h | tte_now |
-|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---|
-| KXCPI-26APR-T0.5 | 0.5% | 36c | 2.0c | 342 | 5773 | 742 | 6106 | 25420 | $1198 | 7-30d |
-| KXCPI-26APR-T0.4 | 0.4% | 76c | 1.0c | 18 | 10316 | 1306 | 10316 | 24618 | $2603 | 7-30d |
-| KXCPICORE-26APR-T0.3 | 0.3 | 48c | 3.0c | 505 | 25 | 505 | 704 | 21238 | $10 | 7-30d |
-| KXCPICORE-26APR-T0.4 | 0.4 | 20c | 2.0c | 500 | 30 | 550 | 784 | 18892 | $0 | 7-30d |
-| KXCPI-26APR-T0.6 | 0.6% | 16c | 5.0c | 365 | 378 | 370 | 535 | 17277 | $3393 | 7-30d |
-| KXCPI-26APR-T0.3 | 0.3% | 94c | 1.0c | 355 | 17100 | 1386 | 18127 | 15951 | $4198 | 7-30d |
-| KXCPI-26APR-T0.7 | 0.7% | 8c | 2.0c | 355 | 120 | 2090 | 454 | 8744 | $560 | 7-30d |
-| KXCPICORE-26APR-T0.2 | 0.2 | 78c | 4.0c | 519 | 37 | 519 | 671 | 7049 | $68 | 7-30d |
-| KXCPI-26MAY-T1.0 | 1.0% | 7c | 2.0c | 702 | 200 | 927 | 596 | 2445 | $457 | 30d+ |
-| KXCPI-26MAY-T0.1 | 0.1% | 42c | 2.0c | 1 | 200 | 3 | 202 | 1721 | $52 | 30d+ |
-| KXCPI-26MAY-T0.5 | 0.5% | 14c | 8.0c | 200 | 6 | 200 | 206 | 1656 | $6 | 30d+ |
-| KXCPI-26MAY-T0.3 | 0.3% | 23c | 10.0c | 1 | 200 | 1 | 200 | 1574 | $105 | 30d+ |
-| KXCPI-26MAY-T0.4 | 0.4% | 20c | 6.0c | 86 | 200 | 286 | 200 | 1510 | $97 | 30d+ |
-| KXCPI-26MAY-T0.2 | 0.2% | 35c | 4.0c | 1 | 200 | 1 | 200 | 1194 | $6 | 30d+ |
-| KXCPI-26MAY-T0.6 | 0.6% | 13c | 11.0c | 200 | 200 | 0 | 0 | 1085 | $185 | 30d+ |
+| ticker | subtitle | mid | spread_c | tob_bid | tob_ask | d5c_bid | d5c_ask | d10c_bid | d10c_ask | oi | vol_24h | tte_now |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|
+| KXCPI-26APR-T0.5 | 0.5% | 36c | 2.0c | 9 | 5773 | 742 | 6106 | 942 | 6155 | 25423 | $1185 | 7-30d |
+| KXCPI-26APR-T0.4 | 0.4% | 74c | 2.0c | 826 | 367 | 1411 | 10337 | 1413 | 10484 | 24588 | $3829 | 7-30d |
+| KXCPICORE-26APR-T0.3 | 0.3 | 48c | 3.0c | 505 | 25 | 505 | 849 | 505 | 879 | 21238 | $10 | 7-30d |
+| KXCPICORE-26APR-T0.4 | 0.4 | 20c | 2.0c | 500 | 30 | 550 | 784 | 550 | 869 | 18892 | $0 | 7-30d |
+| KXCPI-26APR-T0.6 | 0.6% | 16c | 5.0c | 365 | 529 | 370 | 551 | 370 | 551 | 17277 | $3209 | 7-30d |
+| KXCPI-26APR-T0.3 | 0.3% | 94c | 1.0c | 355 | 16274 | 1386 | 17684 | 1386 | 17684 | 16351 | $5213 | 7-30d |
+| KXCPI-26APR-T0.7 | 0.7% | 8c | 2.0c | 355 | 650 | 2090 | 651 | 2147 | 653 | 8746 | $432 | 7-30d |
+| KXCPICORE-26APR-T0.2 | 0.2 | 78c | 4.0c | 519 | 37 | 519 | 788 | 535 | 940 | 7049 | $68 | 7-30d |
+| KXCPI-26MAY-T1.0 | 1.0% | 7c | 2.0c | 702 | 200 | 955 | 596 | 955 | 597 | 2445 | $456 | 30d+ |
+| KXCPI-26MAY-T0.1 | 0.1% | 42c | 2.0c | 1 | 200 | 3 | 202 | 203 | 202 | 1721 | $51 | 30d+ |
+| KXCPI-26MAY-T0.5 | 0.5% | 14c | 8.0c | 200 | 6 | 200 | 309 | 200 | 311 | 1656 | $5 | 30d+ |
+| KXCPI-26MAY-T0.3 | 0.3% | 23c | 10.0c | 1 | 200 | 201 | 290 | 201 | 290 | 1574 | $104 | 30d+ |
+| KXCPI-26MAY-T0.4 | 0.4% | 20c | 2.0c | 1 | 1 | 288 | 202 | 288 | 203 | 1510 | $96 | 30d+ |
+| KXCPI-26MAY-T0.2 | 0.2% | 34c | 3.0c | 81 | 79 | 82 | 279 | 282 | 279 | 1194 | $6 | 30d+ |
+| KXCPI-26MAY-T0.6 | 0.6% | 13c | 11.0c | 200 | 200 | 200 | 200 | 288 | 317 | 1085 | $181 | 30d+ |
 
 ## Top series by OI
 
 | series | title | freq | n_mkts | n_con | 24h_vol | total_oi | top_oi_spread |
 |---|---|---|---:|---:|---:|---:|---:|
-| KXCPI | CPI | monthly | 68 | 56 | $12,995 | 146,005 | 2.7c |
-| KXCPICORE | CPI core | monthly | 38 | 11 | $98 | 54,065 | 3.3c |
+| KXCPI | CPI | monthly | 68 | 56 | $17,414 | 148,478 | 3.0c |
+| KXCPICORE | CPI core | monthly | 38 | 11 | $98 | 54,065 | 3.0c |
 | KXPPIVSCPI | PPI YoY exceeds CPI YoY for [time period | custom | 1 | 0 | $0 | 12,760 | nanc |
 | KXUSEDCARCPI | US used cars and trucks CPI in [month] | monthly | 7 | 3 | $0 | 2,822 | 5.3c |
 | KXUSGASCPI | US gasoline CPI in [month] | monthly | 15 | 4 | $200 | 2,657 | 16.7c |

@@ -6,7 +6,7 @@ _Auto-generated. Curated notes (KEEP block) preserved across runs._
 
 - Series: **1** (1 with open markets)
 - Open markets: **12** (8 contested)
-- Total 24h volume: **$31**
+- Total 24h volume: **$1**
 - Total open interest: **32**
 - Top-OI mean spread (median across series): **51.7 cents**
 - **MM profile: Wide but dead**
@@ -16,30 +16,31 @@ _Auto-generated. Curated notes (KEEP block) preserved across runs._
 - Markets sampled: **8**
 - Median spread: **67.0c**
 - Median TOB bid / ask size: **8 / 8** contracts
-- Median cumulative depth within 5c of mid — bid: **0** / ask: **0** contracts
-- Median cumulative depth within 10c of mid — bid: **0** / ask: **0** contracts
+- Median depth within 5c of best bid / ask — **8 / 8** contracts
+- Median depth within 10c of best bid / ask — **313 / 312** contracts
+- Median depth within 5c of midpoint — bid: **0** / ask: **0** (useful for tight-spread markets only)
 - Mean trades per market (last 3000): **0**
 - Mean informed-signal proxy: **nan** (sign(trade) * forward cent-move; >0 = toxic)
 - Mean abs consecutive-trade move: **nanc**
 
 ## Top markets (by OI)
 
-| ticker | subtitle | mid | spread_c | tob_bid | tob_ask | depth_5c_bid | depth_5c_ask | oi | vol_24h | tte_now |
-|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---|
-| KXUSPPIYOY-26MAY13-T5.2 | Above 5.2% | 16c | 5.0c | 10 | 331 | 10 | 331 | 10 | $10 | 7-30d |
-| KXUSPPIYOY-26MAY13-T5.0 | Above 5.0% | 50c | 75.0c | 8 | 8 | 0 | 0 | 0 | $0 | 7-30d |
-| KXUSPPIYOY-26MAY13-T4.8 | Above 4.8% | 50c | 75.0c | 8 | 8 | 0 | 0 | 0 | $0 | 7-30d |
-| KXUSPPIYOY-26MAY13-T4.6 | Above 4.6% | 50c | 75.0c | 8 | 8 | 0 | 0 | 0 | $0 | 7-30d |
-| KXUSPPIYOY-26MAY13-T4.4 | Above 4.4% | 51c | 72.0c | 8 | 8 | 0 | 0 | 0 | $0 | 7-30d |
-| KXUSPPIYOY-26MAY13-T4.2 | Above 4.2% | 54c | 61.0c | 7 | 6 | 0 | 0 | 0 | $0 | 7-30d |
-| KXUSPPIYOY-26MAY13-T4.0 | Above 4.0% | 54c | 61.0c | 7 | 6 | 0 | 0 | 0 | $0 | 7-30d |
-| KXUSPPIYOY-26MAY13-T3.8 | Above 3.8% | 56c | 62.0c | 7 | 8 | 0 | 0 | 0 | $0 | 7-30d |
+| ticker | subtitle | mid | spread_c | tob_bid | tob_ask | d5c_bid | d5c_ask | d10c_bid | d10c_ask | oi | vol_24h | tte_now |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|
+| KXUSPPIYOY-26MAY13-T5.2 | Above 5.2% | 16c | 5.0c | 10 | 324 | 60 | 324 | 280 | 324 | 10 | $0 | 7-30d |
+| KXUSPPIYOY-26MAY13-T5.0 | Above 5.0% | 50c | 75.0c | 8 | 8 | 8 | 8 | 308 | 308 | 0 | $0 | 7-30d |
+| KXUSPPIYOY-26MAY13-T4.8 | Above 4.8% | 50c | 75.0c | 9 | 9 | 9 | 9 | 137 | 246 | 0 | $0 | 7-30d |
+| KXUSPPIYOY-26MAY13-T4.6 | Above 4.6% | 50c | 75.0c | 9 | 9 | 9 | 9 | 164 | 246 | 0 | $0 | 7-30d |
+| KXUSPPIYOY-26MAY13-T4.4 | Above 4.4% | 51c | 72.0c | 8 | 9 | 8 | 9 | 318 | 246 | 0 | $0 | 7-30d |
+| KXUSPPIYOY-26MAY13-T4.2 | Above 4.2% | 54c | 61.0c | 7 | 6 | 7 | 6 | 572 | 316 | 0 | $0 | 7-30d |
+| KXUSPPIYOY-26MAY13-T4.0 | Above 4.0% | 54c | 61.0c | 7 | 6 | 7 | 6 | 572 | 316 | 0 | $0 | 7-30d |
+| KXUSPPIYOY-26MAY13-T3.8 | Above 3.8% | 56c | 62.0c | 7 | 8 | 7 | 8 | 572 | 318 | 0 | $0 | 7-30d |
 
 ## Top series by OI
 
 | series | title | freq | n_mkts | n_con | 24h_vol | total_oi | top_oi_spread |
 |---|---|---|---:|---:|---:|---:|---:|
-| KXUSPPIYOY | US PPI YoY in [month] | monthly | 12 | 8 | $31 | 32 | 51.7c |
+| KXUSPPIYOY | US PPI YoY in [month] | monthly | 12 | 8 | $1 | 32 | 51.7c |
 
 ## Curated notes
 

@@ -9,18 +9,19 @@ _Auto-generated. Curated notes (KEEP block) preserved across runs._
 - Total 24h volume: **$0**
 - Total open interest: **833**
 - Top-OI mean spread (median across series): **6.5 cents**
-- **MM profile: Moderate (mixed)**
+- **MM profile: Toxic flow**
 
 ## Book depth (from comprehensive scan)
 
 - Markets sampled: **2**
 - Median spread: **6.5c**
 - Median TOB bid / ask size: **40 / 650** contracts
-- Median cumulative depth within 5c of mid — bid: **690** / ask: **650** contracts
-- Median cumulative depth within 10c of mid — bid: **842** / ask: **1050** contracts
+- Median depth within 5c of best bid / ask — **690 / 650** contracts
+- Median depth within 10c of best bid / ask — **1884 / 1050** contracts
+- Median depth within 5c of midpoint — bid: **690** / ask: **650** (useful for tight-spread markets only)
 - Mean trades per market (last 3000): **15**
-- Mean informed-signal proxy: **0.000** (sign(trade) * forward cent-move; >0 = toxic)
-- Mean abs consecutive-trade move: **0.00c**
+- Mean informed-signal proxy: **-2.083** (sign(trade) * forward cent-move; >0 = toxic)
+- Mean abs consecutive-trade move: **2.29c**
 
 ## Informed flow by time-to-expiry
 
@@ -30,14 +31,14 @@ Larger `mean_abs_move` = more price movement between consecutive trades.
 
 | TTE bucket | n_trades | mean_abs_move_c | informed_signal_c | p95_abs_move_c | mean_size |
 |---|---:|---:|---:|---:|---:|
-| 30d+ | 30 | 0.00 | 0.000 | 0.00 | 0.0 |
+| 30d+ | 30 | 2.32 | -2.179 | 7.00 | 32.9 |
 
 ## Top markets (by OI)
 
-| ticker | subtitle | mid | spread_c | tob_bid | tob_ask | depth_5c_bid | depth_5c_ask | oi | vol_24h | tte_now |
-|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---|
-| KXMEDIAGUESTJAKESHANE-27-JAK | Jake Shane | 20c | 6.0c | 32 | 500 | 532 | 500 | 432 | $0 | 30d+ |
-| KXMEDIAGUESTERICADAMS-27-ERI | Eric Adams | 12c | 7.0c | 49 | 800 | 849 | 800 | 401 | $0 | 30d+ |
+| ticker | subtitle | mid | spread_c | tob_bid | tob_ask | d5c_bid | d5c_ask | d10c_bid | d10c_ask | oi | vol_24h | tte_now |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|
+| KXMEDIAGUESTJAKESHANE-27-JAK | Jake Shane | 20c | 6.0c | 32 | 500 | 532 | 500 | 532 | 500 | 432 | $0 | 30d+ |
+| KXMEDIAGUESTERICADAMS-27-ERI | Eric Adams | 12c | 7.0c | 49 | 800 | 849 | 800 | 3235 | 1600 | 401 | $0 | 30d+ |
 
 ## Top series by OI
 

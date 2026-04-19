@@ -6,8 +6,8 @@ _Auto-generated. Curated notes (KEEP block) preserved across runs._
 
 - Series: **2** (2 with open markets)
 - Open markets: **17** (0 contested)
-- Total 24h volume: **$15,939**
-- Total open interest: **172,682**
+- Total 24h volume: **$14,083**
+- Total open interest: **173,340**
 - Top-OI mean spread: n/a
 - **MM profile: Unknown**
 
@@ -15,8 +15,8 @@ _Auto-generated. Curated notes (KEEP block) preserved across runs._
 
 | series | title | freq | n_mkts | n_con | 24h_vol | total_oi | top_oi_spread |
 |---|---|---|---:|---:|---:|---:|---:|
-| KXWNBADELAY | WNBA Season Delay | one_off | 10 | 0 | $13,029 | 136,459 | nanc |
-| KXWNBAGAMESPLAYED | WNBA Games Played in a Season | one_off | 7 | 0 | $2,910 | 36,224 | nanc |
+| KXWNBADELAY | WNBA Season Delay | one_off | 10 | 0 | $12,351 | 137,044 | nanc |
+| KXWNBAGAMESPLAYED | WNBA Games Played in a Season | one_off | 7 | 0 | $1,732 | 36,295 | nanc |
 
 ## Curated notes
 

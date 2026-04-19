@@ -6,21 +6,22 @@ _Auto-generated. Curated notes (KEEP block) preserved across runs._
 
 - Series: **1** (1 with open markets)
 - Open markets: **12** (12 contested)
-- Total 24h volume: **$1,958**
-- Total open interest: **1,671**
-- Top-OI mean spread (median across series): **1.3 cents**
+- Total 24h volume: **$38,070**
+- Total open interest: **37,794**
+- Top-OI mean spread (median across series): **5.0 cents**
 - **MM profile: HFT-saturated**
 
 ## Book depth (from comprehensive scan)
 
-- Markets sampled: **12**
-- Median spread: **2.0c**
-- Median TOB bid / ask size: **1065 / 1594** contracts
-- Median cumulative depth within 5c of mid — bid: **4799** / ask: **4668** contracts
-- Median cumulative depth within 10c of mid — bid: **5239** / ask: **5023** contracts
-- Mean trades per market (last 3000): **13**
-- Mean informed-signal proxy: **0.000** (sign(trade) * forward cent-move; >0 = toxic)
-- Mean abs consecutive-trade move: **0.00c**
+- Markets sampled: **9**
+- Median spread: **1.0c**
+- Median TOB bid / ask size: **512 / 1500** contracts
+- Median depth within 5c of best bid / ask — **6535 / 4842** contracts
+- Median depth within 10c of best bid / ask — **6535 / 5896** contracts
+- Median depth within 5c of midpoint — bid: **5517** / ask: **4797** (useful for tight-spread markets only)
+- Mean trades per market (last 3000): **21**
+- Mean informed-signal proxy: **-0.111** (sign(trade) * forward cent-move; >0 = toxic)
+- Mean abs consecutive-trade move: **0.56c**
 
 ## Informed flow by time-to-expiry
 
@@ -30,30 +31,30 @@ Larger `mean_abs_move` = more price movement between consecutive trades.
 
 | TTE bucket | n_trades | mean_abs_move_c | informed_signal_c | p95_abs_move_c | mean_size |
 |---|---:|---:|---:|---:|---:|
-| 7-30d | 153 | 0.00 | 0.000 | 0.00 | 0.0 |
+| 7-30d | 1776 | 1.67 | -0.319 | 6.00 | 99.8 |
 
 ## Top markets (by OI)
 
-| ticker | subtitle | mid | spread_c | tob_bid | tob_ask | depth_5c_bid | depth_5c_ask | oi | vol_24h | tte_now |
-|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---|
-| KXJLEAGUEGAME-26APR19GAMFAG-GAM | Gamba | 49c | 2.0c | 1807 | 1759 | 4944 | 5040 | 809 | $803 | 7-30d |
-| KXJLEAGUEGAME-26APR19MITREY-MIT | Mito H | 21c | 1.0c | 1 | 10371 | 12255 | 18048 | 601 | $494 | 7-30d |
-| KXJLEAGUEGAME-26APR19MITREY-REY | Kashiwa | 51c | 2.0c | 3304 | 2760 | 12419 | 11460 | 378 | $714 | 7-30d |
-| KXJLEAGUEGAME-26APR19NGEAVI-NGE | Nagoya | 50c | 2.0c | 1657 | 1687 | 4535 | 4993 | 144 | $144 | 7-30d |
-| KXJLEAGUEGAME-26APR19GAMFAG-FAG | Fagiano O | 24c | 1.0c | 1618 | 309 | 4655 | 4526 | 135 | $136 | 7-30d |
-| KXJLEAGUEGAME-26APR19MITREY-TIE | Tie | 28c | 2.0c | 4867 | 3596 | 8651 | 9167 | 33 | $33 | 7-30d |
-| KXJLEAGUEGAME-26APR19GAMFAG-TIE | Tie | 28c | 1.0c | 159 | 1500 | 6352 | 4099 | 33 | $33 | 7-30d |
-| KXJLEAGUEGAME-26APR19NGEAVI-AVI | Avispa | 24c | 1.0c | 1653 | 336 | 6784 | 3712 | 22 | $38 | 7-30d |
-| KXJLEAGUEGAME-26APR19NGEAVI-TIE | Tie | 28c | 1.0c | 1 | 1786 | 3954 | 4810 | 4 | $4 | 7-30d |
-| KXJLEAGUEGAME-26APR22GAMAVI-TIE | Tie | 42c | 76.0c | 512 | 10 | 0 | 0 | 0 | $0 | 7-30d |
-| KXJLEAGUEGAME-26APR22GAMAVI-GAM | Gamba | 42c | 76.0c | 512 | 10 | 0 | 0 | 0 | $0 | 7-30d |
-| KXJLEAGUEGAME-26APR22GAMAVI-AVI | Avispa | 42c | 76.0c | 512 | 10 | 0 | 0 | 0 | $0 | 7-30d |
+| ticker | subtitle | mid | spread_c | tob_bid | tob_ask | d5c_bid | d5c_ask | d10c_bid | d10c_ask | oi | vol_24h | tte_now |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|
+| KXJLEAGUEGAME-26APR19MITREY-REY | Kashiwa | nanc | nanc | nan | nan | nan | nan | nan | nan | 18360 | $19570 | 7-30d |
+| KXJLEAGUEGAME-26APR19MITREY-MIT | Mito H | nanc | nanc | nan | nan | nan | nan | nan | nan | 12486 | $11158 | 7-30d |
+| KXJLEAGUEGAME-26APR19MITREY-TIE | Tie | nanc | nanc | nan | nan | nan | nan | nan | nan | 7028 | $7629 | 7-30d |
+| KXJLEAGUEGAME-26APR19GAMFAG-GAM | Gamba | 57c | 1.0c | 1501 | 629 | 5648 | 23869 | 6150 | 25493 | 3129 | $3012 | 7-30d |
+| KXJLEAGUEGAME-26APR19NGEAVI-NGE | Nagoya | 57c | 1.0c | 10 | 20086 | 4254 | 22890 | 4756 | 22890 | 1020 | $1002 | 7-30d |
+| KXJLEAGUEGAME-26APR19GAMFAG-TIE | Tie | 26c | 1.0c | 350 | 3294 | 7017 | 4842 | 7017 | 5896 | 586 | $587 | 7-30d |
+| KXJLEAGUEGAME-26APR19GAMFAG-FAG | Fagiano O | 18c | 1.0c | 426 | 1895 | 7901 | 5286 | 8016 | 6476 | 269 | $313 | 7-30d |
+| KXJLEAGUEGAME-26APR19NGEAVI-TIE | Tie | 25c | 2.0c | 661 | 1843 | 5726 | 5614 | 5726 | 6114 | 72 | $73 | 7-30d |
+| KXJLEAGUEGAME-26APR19NGEAVI-AVI | Avispa | 19c | 1.0c | 337 | 1500 | 8050 | 4642 | 8077 | 5642 | 22 | $38 | 7-30d |
+| KXJLEAGUEGAME-26APR22GAMAVI-TIE | Tie | 43c | 77.0c | 512 | 100 | 6535 | 200 | 6535 | 349 | 0 | $0 | 7-30d |
+| KXJLEAGUEGAME-26APR22GAMAVI-GAM | Gamba | 43c | 77.0c | 512 | 100 | 6334 | 200 | 6334 | 349 | 0 | $0 | 7-30d |
+| KXJLEAGUEGAME-26APR22GAMAVI-AVI | Avispa | 43c | 77.0c | 512 | 100 | 6634 | 200 | 6634 | 349 | 0 | $0 | 7-30d |
 
 ## Top series by OI
 
 | series | title | freq | n_mkts | n_con | 24h_vol | total_oi | top_oi_spread |
 |---|---|---|---:|---:|---:|---:|---:|
-| KXJLEAGUEGAME | Japan J League Game | custom | 12 | 12 | $1,958 | 1,671 | 1.3c |
+| KXJLEAGUEGAME | Japan J League Game | custom | 12 | 12 | $38,070 | 37,794 | 5.0c |
 
 ## Curated notes
 

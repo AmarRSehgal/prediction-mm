@@ -5,22 +5,23 @@ _Auto-generated. Curated notes (KEEP block) preserved across runs._
 ## Summary
 
 - Series: **2** (2 with open markets)
-- Open markets: **36** (26 contested)
-- Total 24h volume: **$10,131**
-- Total open interest: **22,717**
-- Top-OI mean spread (median across series): **44.0 cents**
-- **MM profile: Mixed / thin**
+- Open markets: **46** (36 contested)
+- Total 24h volume: **$19,943**
+- Total open interest: **35,543**
+- Top-OI mean spread (median across series): **52.3 cents**
+- **MM profile: Toxic flow**
 
 ## Book depth (from comprehensive scan)
 
-- Markets sampled: **26**
-- Median spread: **62.0c**
-- Median TOB bid / ask size: **1031 / 1030** contracts
-- Median cumulative depth within 5c of mid — bid: **0** / ask: **0** contracts
-- Median cumulative depth within 10c of mid — bid: **0** / ask: **0** contracts
-- Mean trades per market (last 3000): **27**
-- Mean informed-signal proxy: **0.000** (sign(trade) * forward cent-move; >0 = toxic)
-- Mean abs consecutive-trade move: **0.00c**
+- Markets sampled: **36**
+- Median spread: **85.0c**
+- Median TOB bid / ask size: **555 / 10** contracts
+- Median depth within 5c of best bid / ask — **1568 / 2151** contracts
+- Median depth within 10c of best bid / ask — **1622 / 2182** contracts
+- Median depth within 5c of midpoint — bid: **0** / ask: **0** (useful for tight-spread markets only)
+- Mean trades per market (last 3000): **40**
+- Mean informed-signal proxy: **-6.092** (sign(trade) * forward cent-move; >0 = toxic)
+- Mean abs consecutive-trade move: **8.59c**
 
 ## Informed flow by time-to-expiry
 
@@ -30,34 +31,34 @@ Larger `mean_abs_move` = more price movement between consecutive trades.
 
 | TTE bucket | n_trades | mean_abs_move_c | informed_signal_c | p95_abs_move_c | mean_size |
 |---|---:|---:|---:|---:|---:|
-| 1-3d | 212 | 0.00 | 0.000 | 0.00 | 0.0 |
-| 3-7d | 500 | 0.00 | 0.000 | 0.00 | 0.0 |
+| 1-3d | 558 | 5.20 | -1.156 | 27.00 | 35.0 |
+| 3-7d | 892 | 2.28 | -0.848 | 9.35 | 63.4 |
 
 ## Top markets (by OI)
 
-| ticker | subtitle | mid | spread_c | tob_bid | tob_ask | depth_5c_bid | depth_5c_ask | oi | vol_24h | tte_now |
-|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---|
-| KXKBOGAME-26APR170530LGSAM-LG | LG Twins | 42c | 67.0c | 499 | 47 | 0 | 0 | 7267 | $3126 | 1-3d |
-| KXKBOGAME-26APR170530LGSAM-SAM | Samsung Lions | 52c | 57.0c | 3 | 53 | 0 | 0 | 5277 | $719 | 1-3d |
-| KXKBOGAME-26APR170530SSGNCD-SSG | SSG Landers | 48c | 71.0c | 10 | 10 | 0 | 0 | 3198 | $1612 | 1-3d |
-| KXKBOGAME-26APR170530SSGNCD-NCD | NC Dinos | 18c | 9.0c | 483 | 1 | 483 | 1 | 2960 | $1435 | 1-3d |
-| KXKBOGAME-26APR170530HANLOT-LOT | Lotte Giants | 30c | 47.0c | 996 | 5 | 0 | 0 | 1714 | $116 | 1-3d |
-| KXKBOGAME-26APR170530HANLOT-HAN | Hanwha Eagles | 50c | 88.0c | 1112 | 3 | 0 | 0 | 807 | $148 | 1-3d |
-| KXKBOGAME-26APR190100SSGNCD-SSG | SSG Landers | 43c | 3.0c | 80 | 1030 | 2015 | 2173 | 511 | $811 | 3-7d |
-| KXKBOGAME-26APR190400KIWKTW-KTW | KT Wiz | 65c | 6.0c | 1031 | 1048 | 2531 | 2048 | 357 | $243 | 3-7d |
-| KXKBOGAME-26APR190400KIWKTW-KIW | Kiwoom Heroes | 34c | 9.0c | 1031 | 1030 | 1031 | 1030 | 250 | $143 | 3-7d |
-| KXKBOGAME-26APR190100LGSAM-SAM | Samsung Lions | 48c | 3.0c | 1258 | 788 | 2758 | 5599 | 162 | $1473 | 3-7d |
-| KXKBOGAME-26APR190100KIADOO-KIA | Kia Tigers | 58c | 4.0c | 2000 | 287 | 3997 | 2287 | 130 | $126 | 3-7d |
-| KXKBOGAME-26APR190100SSGNCD-NCD | NC Dinos | 56c | 4.0c | 1035 | 1823 | 2535 | 6053 | 102 | $41 | 3-7d |
-| KXKBOGAME-26APR210530KIAKTW-KIA | Kia Tigers | 41c | 78.0c | 25 | 3 | 0 | 0 | 87 | $87 | 3-7d |
-| KXKBOGAME-26APR190100LGSAM-LG | LG Twins | 52c | 3.0c | 1000 | 1030 | 2926 | 2397 | 61 | $61 | 3-7d |
-| KXKBOGAME-26APR190100HANLOT-HAN | Hanwha Eagles | 56c | 1.0c | 11 | 1795 | 2125 | 5022 | 58 | $96 | 3-7d |
+| ticker | subtitle | mid | spread_c | tob_bid | tob_ask | d5c_bid | d5c_ask | d10c_bid | d10c_ask | oi | vol_24h | tte_now |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|
+| KXKBOGAME-26APR170530LGSAM-LG | LG Twins | 31c | 44.0c | 21 | 1 | 2559 | 1 | 3005 | 1 | 7272 | $3126 | 1-3d |
+| KXKBOGAME-26APR170530LGSAM-SAM | Samsung Lions | 51c | 58.0c | 222 | 45 | 1481 | 121 | 2037 | 1380 | 5277 | $709 | 1-3d |
+| KXKBOGAME-26APR190100LGSAM-LG | LG Twins | 60c | 8.0c | 26 | 18 | 146 | 19 | 211 | 20 | 4512 | $3376 | 1-3d |
+| KXKBOGAME-26APR190100KIADOO-KIA | Kia Tigers | 43c | 2.0c | 3 | 45 | 76 | 2031 | 282 | 2971 | 3613 | $3332 | 1-3d |
+| KXKBOGAME-26APR190400KIWKTW-KTW | KT Wiz | 68c | 3.0c | 91 | 125 | 2760 | 2198 | 2983 | 2198 | 3472 | $3152 | 3-7d |
+| KXKBOGAME-26APR170530SSGNCD-SSG | SSG Landers | 68c | 36.0c | 71 | 2 | 71 | 1402 | 71 | 1501 | 3238 | $1714 | 1-3d |
+| KXKBOGAME-26APR170530SSGNCD-NCD | NC Dinos | 18c | 9.0c | 483 | 1 | 1041 | 1 | 1431 | 1 | 2960 | $1435 | 1-3d |
+| KXKBOGAME-26APR190100LGSAM-SAM | Samsung Lions | 42c | 14.0c | 10 | 304 | 45 | 304 | 46 | 304 | 2578 | $4011 | 1-3d |
+| KXKBOGAME-26APR190100SSGNCD-SSG | SSG Landers | 40c | 15.0c | 164 | 35 | 201 | 99 | 355 | 101 | 2406 | $2606 | 1-3d |
+| KXKBOGAME-26APR190400KIWKTW-KIW | Kiwoom Heroes | 32c | 6.0c | 1040 | 8 | 2663 | 2238 | 2663 | 3522 | 2214 | $2177 | 3-7d |
+| KXKBOGAME-26APR170530HANLOT-LOT | Lotte Giants | 30c | 47.0c | 996 | 5 | 1735 | 6 | 1735 | 6 | 1714 | $116 | 1-3d |
+| KXKBOGAME-26APR190100SSGNCD-NCD | NC Dinos | 56c | 10.0c | 96 | 5 | 157 | 91 | 157 | 91 | 1299 | $1253 | 1-3d |
+| KXKBOGAME-26APR190100HANLOT-HAN | Hanwha Eagles | 53c | 10.0c | 72 | 39 | 294 | 658 | 294 | 710 | 1141 | $1351 | 1-3d |
+| KXKBOGAME-26APR190100KIADOO-DOO | Doosan Bears | 57c | 7.0c | 47 | 6 | 1047 | 2243 | 1071 | 2243 | 948 | $965 | 1-3d |
+| KXKBOGAME-26APR190100HANLOT-LOT | Lotte Giants | 44c | 9.0c | 11 | 5 | 46 | 77 | 46 | 168 | 909 | $909 | 1-3d |
 
 ## Top series by OI
 
 | series | title | freq | n_mkts | n_con | 24h_vol | total_oi | top_oi_spread |
 |---|---|---|---:|---:|---:|---:|---:|
-| KXKBOGAME | KBO Game | custom | 26 | 26 | $10,131 | 22,717 | 44.0c |
+| KXKBOGAME | KBO Game | custom | 36 | 36 | $19,943 | 35,543 | 52.3c |
 | KXKBO | KBO Champion | custom | 10 | 0 | $0 | 0 | nanc |
 
 ## Curated notes
