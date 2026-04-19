@@ -103,8 +103,9 @@ def render(sub: str, series_rows: pd.DataFrame, mkt_rows: pd.DataFrame | None,
         L.append(f"- Markets sampled: **{book_agg.get('n_markets', 0):.0f}**")
         L.append(f"- Median spread: **{book_agg['median_spread_c']:.1f}c**")
         L.append(f"- Median TOB bid / ask size: **{book_agg.get('median_tob_bid', 0):.0f} / {book_agg.get('median_tob_ask', 0):.0f}** contracts")
-        L.append(f"- Median cumulative depth within 5c of mid — bid: **{book_agg.get('median_depth_5c_bid', 0):.0f}** / ask: **{book_agg.get('median_depth_5c_ask', 0):.0f}** contracts")
-        L.append(f"- Median cumulative depth within 10c of mid — bid: **{book_agg.get('median_depth_10c_bid', 0):.0f}** / ask: **{book_agg.get('median_depth_10c_ask', 0):.0f}** contracts")
+        L.append(f"- Median depth within 5c of best bid / ask — **{book_agg.get('median_depth_5c_of_bid', 0) or 0:.0f} / {book_agg.get('median_depth_5c_of_ask', 0) or 0:.0f}** contracts")
+        L.append(f"- Median depth within 10c of best bid / ask — **{book_agg.get('median_depth_10c_of_bid', 0) or 0:.0f} / {book_agg.get('median_depth_10c_of_ask', 0) or 0:.0f}** contracts")
+        L.append(f"- Median depth within 5c of midpoint — bid: **{book_agg.get('median_depth_5c_bid', 0) or 0:.0f}** / ask: **{book_agg.get('median_depth_5c_ask', 0) or 0:.0f}** (useful for tight-spread markets only)")
         L.append(f"- Mean trades per market (last 3000): **{book_agg.get('mean_n_trades', 0):.0f}**")
         L.append(f"- Mean informed-signal proxy: **{book_agg.get('mean_informed', 0):.3f}** (sign(trade) * forward cent-move; >0 = toxic)")
         L.append(f"- Mean abs consecutive-trade move: **{book_agg.get('mean_abs_move_c', 0):.2f}c**")
@@ -131,12 +132,16 @@ def render(sub: str, series_rows: pd.DataFrame, mkt_rows: pd.DataFrame | None,
         top = mkt_rows.sort_values("oi", ascending=False).head(15)
         L.append("## Top markets (by OI)")
         L.append("")
-        L.append("| ticker | subtitle | mid | spread_c | tob_bid | tob_ask | depth_5c_bid | depth_5c_ask | oi | vol_24h | tte_now |")
-        L.append("|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---|")
+        L.append("| ticker | subtitle | mid | spread_c | tob_bid | tob_ask | d5c_bid | d5c_ask | d10c_bid | d10c_ask | oi | vol_24h | tte_now |")
+        L.append("|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|")
         for _, r in top.iterrows():
             mid = r.get("mid_c", 0) or 0
             spr = r.get("spread_c", 0) or 0
-            L.append(f"| {r['ticker']} | {str(r.get('subtitle',''))[:40]} | {mid:.0f}c | {spr:.1f}c | {r.get('tob_bid_sz',0):.0f} | {r.get('tob_ask_sz',0):.0f} | {r.get('cum_bid_5c',0):.0f} | {r.get('cum_ask_5c',0):.0f} | {r.get('oi',0):.0f} | ${r.get('vol_24h',0):.0f} | {r.get('tte_now_bucket','')} |")
+            d5b = r.get("depth_5c_of_bid", 0) or 0
+            d5a = r.get("depth_5c_of_ask", 0) or 0
+            d10b = r.get("depth_10c_of_bid", 0) or 0
+            d10a = r.get("depth_10c_of_ask", 0) or 0
+            L.append(f"| {r['ticker']} | {str(r.get('subtitle',''))[:40]} | {mid:.0f}c | {spr:.1f}c | {r.get('tob_bid_sz',0):.0f} | {r.get('tob_ask_sz',0):.0f} | {d5b:.0f} | {d5a:.0f} | {d10b:.0f} | {d10a:.0f} | {r.get('oi',0):.0f} | ${r.get('vol_24h',0):.0f} | {r.get('tte_now_bucket','')} |")
         L.append("")
 
     # Top series

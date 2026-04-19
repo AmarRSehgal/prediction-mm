@@ -169,8 +169,9 @@ def main() -> int:
         except Exception:
             dm = {"has_two_sides": False}
 
-        # Trades (paginated)
-        trades = pull_all_trades(client, ticker, max_pages=3, per_page=1000)
+        # Trades: Kalshi returns yes_price_dollars (string) and count_fp (string).
+        # Pull fewer pages for speed: 1000 most-recent trades is enough for signal.
+        trades = pull_all_trades(client, ticker, max_pages=1, per_page=1000)
         trades_enriched = []
         if trades and expiry:
             for t in trades:
@@ -180,14 +181,22 @@ def main() -> int:
                 except Exception:
                     ts = None
                 seconds_to_expiry_at_trade = (expiry - ts).total_seconds() if ts else None
+                try:
+                    yp = float(t.get("yes_price_dollars") or t.get("yes_price") or 0)
+                except Exception:
+                    yp = 0.0
+                try:
+                    cnt = float(t.get("count_fp") or t.get("count") or 0)
+                except Exception:
+                    cnt = 0.0
                 trades_enriched.append({
                     "ticker": ticker,
                     "subsector": m.subsector,
                     "series": m.series,
                     "created_time": ct,
                     "ts": ts,
-                    "yes_price": float(t.get("yes_price") or 0),
-                    "count": float(t.get("count") or 0),
+                    "yes_price": yp,
+                    "count": cnt,
                     "taker_side": t.get("taker_side"),
                     "seconds_to_expiry": seconds_to_expiry_at_trade,
                     "tte_bucket": tte_bucket(seconds_to_expiry_at_trade) if seconds_to_expiry_at_trade is not None else "unknown",
@@ -200,11 +209,8 @@ def main() -> int:
             n_trades = len(tdf)
             if n_trades > 1:
                 tdf["next_px"] = tdf["yes_price"].shift(-1)
-                tdf["fwd_move_c"] = (tdf["next_px"] - tdf["yes_price"])
-                # Kalshi yes_price may be stored as cents int (e.g. 55) or dollars (0.55);
-                # heuristic: if max > 1.5, treat as cents; else dollars scale to cents
-                price_scale = 1.0 if tdf["yes_price"].max() > 1.5 else 100.0
-                tdf["fwd_move_c"] = tdf["fwd_move_c"] * price_scale
+                # yes_price is in dollars [0,1]; convert fwd move to cents
+                tdf["fwd_move_c"] = (tdf["next_px"] - tdf["yes_price"]) * 100
                 # Signed informed signal per trade
                 def side_sign(s):
                     s = str(s or "").lower()
@@ -268,11 +274,9 @@ def main() -> int:
         for (sub, bkt), g in trade_df.groupby(["subsector", "tte_bucket"]):
             if len(g) < 10:
                 continue
-            # price scale
-            scale = 1.0 if g["yes_price"].max() > 1.5 else 100.0
             g = g.sort_values(["ticker", "ts"])
             g["next_px"] = g.groupby("ticker")["yes_price"].shift(-1)
-            g["fwd_c"] = (g["next_px"] - g["yes_price"]) * scale
+            g["fwd_c"] = (g["next_px"] - g["yes_price"]) * 100
 
             def sgn(s):
                 s = str(s or "").lower()
@@ -301,6 +305,10 @@ def main() -> int:
             median_spread_c=("spread_c", "median"),
             median_tob_bid=("tob_bid_sz", "median"),
             median_tob_ask=("tob_ask_sz", "median"),
+            median_depth_5c_of_bid=("depth_5c_of_bid", "median"),
+            median_depth_5c_of_ask=("depth_5c_of_ask", "median"),
+            median_depth_10c_of_bid=("depth_10c_of_bid", "median"),
+            median_depth_10c_of_ask=("depth_10c_of_ask", "median"),
             median_depth_5c_bid=("cum_bid_5c", "median"),
             median_depth_5c_ask=("cum_ask_5c", "median"),
             median_depth_10c_bid=("cum_bid_10c", "median"),

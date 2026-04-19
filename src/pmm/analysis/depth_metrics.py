@@ -71,6 +71,17 @@ def depth_metrics(ob_fp: dict[str, Any]) -> dict[str, Any]:
     cum_bid = {f"cum_bid_{int(b*100)}c": cum_bid_within(b) for b in bands}
     cum_ask = {f"cum_ask_{int(b*100)}c": cum_ask_within(b) for b in bands}
 
+    # Bid/ask-relative depth (more useful when spread > 10c — most of the book
+    # sits far from mid but close to the best quote on its own side).
+    def cum_bid_from_best(delta: float) -> float:
+        return sum(s for p, s in yes if p >= yes_bid_price - delta)
+
+    def cum_ask_from_best(delta: float) -> float:
+        return sum(s for p, s in yes_asks if p <= yes_ask_price + delta)
+
+    bid_rel = {f"depth_{int(b*100)}c_of_bid": cum_bid_from_best(b) for b in bands}
+    ask_rel = {f"depth_{int(b*100)}c_of_ask": cum_ask_from_best(b) for b in bands}
+
     total_bid = sum(s for _, s in yes)
     total_ask = sum(s for _, s in yes_asks)
 
@@ -94,6 +105,8 @@ def depth_metrics(ob_fp: dict[str, Any]) -> dict[str, Any]:
         "tob_imbalance": tob_imbalance,
         **cum_bid,
         **cum_ask,
+        **bid_rel,
+        **ask_rel,
         "total_bid_depth": total_bid,
         "total_ask_depth": total_ask,
         "wall_bid_ratio": wall_bid,
