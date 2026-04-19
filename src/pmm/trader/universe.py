@@ -42,7 +42,7 @@ def discover_markets(
     series_df: pd.DataFrame,
     price_band: tuple[float, float] = (0.15, 0.85),
     max_hours_to_close: float = 720.0,  # 30 days
-    max_per_subsector: int = 20,
+    max_per_subsector: int = 0,  # 0 = no cap; trade everything
 ) -> list[MarketInfo]:
     """Return every open contested market whose subsector is in target_subsectors."""
     series_df = series_df.copy()
@@ -102,19 +102,16 @@ def discover_markets(
                 vol_24h=float(m.get("volume_24h_fp") or 0),
                 oi=float(m.get("open_interest_fp") or 0),
             ))
-    # Cap per subsector. Uses per-subsector tuning if available, falling back
-    # to max_per_subsector default.
-    try:
-        from pmm.trader.subsector_tuning import get as get_tuning
-    except Exception:
-        get_tuning = None
+    # Cap disabled when max_per_subsector == 0. Trade everything worth trading;
+    # realized-vol gate + calendar + inventory caps limit actual exposure.
     if max_per_subsector > 0:
+        from pmm.trader.subsector_tuning import get as get_tuning
         by_sub: dict[str, list[MarketInfo]] = {}
         for m in out:
             by_sub.setdefault(m.subsector, []).append(m)
         trimmed: list[MarketInfo] = []
         for sub, lst in by_sub.items():
-            cap = get_tuning(sub).max_markets if get_tuning else max_per_subsector
+            cap = get_tuning(sub).max_markets
             lst.sort(key=lambda x: x.oi, reverse=True)
             trimmed.extend(lst[:cap])
         out = trimmed
