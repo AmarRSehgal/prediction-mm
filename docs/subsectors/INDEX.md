@@ -1,6 +1,6 @@
 # Subsector index (auto-generated)
 
-Total active subsectors: 82
+Total active subsectors: 105
 
 | subsector | n_series | n_markets | n_contested | 24h_vol | top_oi_spread_c |
 |---|---:|---:|---:|---:|---:|
@@ -8,6 +8,7 @@ Total active subsectors: 82
 | [sports_nba](sports/nba.md) | 38 | 1496 | 745 | $7,362,609 | 9.5 |
 | [weather_temp](weather/temp.md) | 18 | 216 | 54 | $1,947,337 | 2.3 |
 | [pol_primary](politics/primary.md) | 66 | 1230 | 317 | $1,944,594 | 3.7 |
+| [sports_cricket_ipl](sports/cricket_ipl.md) | 1 | 22 | 22 | $1,412,802 | 1.0 |
 | [sports_nhl](sports/nhl.md) | 14 | 723 | 491 | $1,084,343 | 14.0 |
 | [sports_soccer_ligamx](sports/soccer_ligamx.md) | 2 | 39 | 27 | $1,048,562 | 9.8 |
 | [sports_tennis_challenger](sports/tennis_challenger.md) | 2 | 144 | 115 | $971,013 | 2.8 |
@@ -15,6 +16,7 @@ Total active subsectors: 82
 | [crypto_btc](crypto/btc.md) | 16 | 473 | 29 | $524,875 | 2.0 |
 | [pol_figures](politics/figures.md) | 63 | 439 | 322 | $414,196 | 3.4 |
 | [comm_energy](commodities/energy.md) | 22 | 436 | 271 | $385,928 | 8.3 |
+| [sports_motor_nascar](sports/motor_nascar.md) | 8 | 117 | 117 | $284,381 | 14.7 |
 | [sports_soccer_ucl](sports/soccer_ucl.md) | 12 | 66 | 47 | $275,098 | 2.6 |
 | [ent_music](entertainment/music.md) | 84 | 1942 | 662 | $238,437 | 9.3 |
 | [sports_soccer_bundesliga](sports/soccer_bundesliga.md) | 10 | 149 | 94 | $190,179 | 1.7 |
@@ -22,12 +24,16 @@ Total active subsectors: 82
 | [pol_race](politics/race.md) | 189 | 870 | 322 | $151,404 | 3.0 |
 | [sports_soccer_seriea](sports/soccer_seriea.md) | 9 | 169 | 104 | $134,234 | 2.0 |
 | [sports_ncaabball](sports/ncaabball.md) | 5 | 205 | 52 | $122,200 | 33.0 |
+| [sports_soccer_worldcup](sports/soccer_worldcup.md) | 2 | 8 | 8 | $108,673 | 0.6 |
 | [rankings_misc](rankings/misc.md) | 6 | 129 | 32 | $103,572 | 5.8 |
 | [sports_soccer_epl](sports/soccer_epl.md) | 3 | 55 | 19 | $94,253 | 2.3 |
 | [pol_fiscal](politics/fiscal.md) | 6 | 50 | 26 | $92,925 | 7.3 |
 | [sports_tennis_itf](sports/tennis_itf.md) | 2 | 346 | 346 | $84,185 | 14.7 |
+| [sports_draft](sports/draft.md) | 17 | 200 | 200 | $83,178 | 8.0 |
 | [sports_ncaafootball](sports/ncaafootball.md) | 64 | 560 | 237 | $82,314 | 4.3 |
+| [sports_esports_cs2](sports/esports_cs2.md) | 1 | 18 | 18 | $82,092 | 1.3 |
 | [sports_baseball_us](sports/baseball_us.md) | 16 | 893 | 90 | $78,505 | 5.3 |
+| [sports_esports_valorant](sports/esports_valorant.md) | 2 | 140 | 140 | $71,656 | 12.0 |
 | [fin_equity_indices](financials/equity_indices.md) | 10 | 199 | 44 | $68,344 | 7.0 |
 | [sports_nfl](sports/nfl.md) | 16 | 719 | 114 | $66,203 | 27.2 |
 | [world_royalty](world/royalty.md) | 7 | 59 | 3 | $64,672 | 7.0 |
@@ -38,6 +44,8 @@ Total active subsectors: 82
 | [weather_rain](weather/rain.md) | 13 | 71 | 19 | $38,763 | 4.0 |
 | [sports_soccer_jleague](sports/soccer_jleague.md) | 1 | 12 | 12 | $38,070 | 5.0 |
 | [comm_gold](commodities/gold.md) | 6 | 128 | 100 | $37,977 | 14.0 |
+| [sports_motor_indycar](sports/motor_indycar.md) | 2 | 9 | 9 | $37,210 | 2.7 |
+| [sports_esports_dota](sports/esports_dota.md) | 2 | 44 | 44 | $36,238 | 5.7 |
 | [comm_agri](commodities/agri.md) | 14 | 352 | 308 | $35,669 | 33.7 |
 | [crypto_meme](crypto/meme.md) | 9 | 373 | 49 | $34,866 | 3.0 |
 | [sports_soccer_mls](sports/soccer_mls.md) | 8 | 166 | 113 | $33,435 | 1.8 |
@@ -46,6 +54,7 @@ Total active subsectors: 82
 | [companies_ipo](companies/ipo.md) | 24 | 300 | 137 | $27,583 | 8.3 |
 | [companies_earnings](companies/earnings.md) | 29 | 366 | 343 | $21,592 | 8.0 |
 | [sports_baseball_kbo](sports/baseball_kbo.md) | 2 | 46 | 36 | $19,943 | 52.3 |
+| [sports_cricket_psl](sports/cricket_psl.md) | 1 | 26 | 26 | $17,960 | 4.7 |
 | [eco_cpi](economics/cpi.md) | 9 | 156 | 92 | $17,727 | 9.5 |
 | [companies_execs](companies/execs.md) | 19 | 115 | 83 | $16,388 | 5.0 |
 | [tech_ev_tesla](tech/ev_tesla.md) | 7 | 43 | 26 | $14,522 | 3.8 |
@@ -54,19 +63,26 @@ Total active subsectors: 82
 | [world_mideast](world/mideast.md) | 18 | 88 | 42 | $13,356 | 4.7 |
 | [pol_confirmation](politics/confirmation.md) | 22 | 182 | 117 | $11,880 | 6.7 |
 | [sports_basketball_cba](sports/basketball_cba.md) | 1 | 20 | 18 | $9,976 | 1.7 |
+| [sports_coachhire](sports/coachhire.md) | 9 | 117 | 117 | $9,884 | 8.3 |
 | [sports_baseball_npb](sports/baseball_npb.md) | 2 | 48 | 35 | $9,798 | 5.0 |
 | [crypto_sol](crypto/sol.md) | 8 | 432 | 40 | $8,515 | 5.3 |
 | [eco_ratedecisions](economics/ratedecisions.md) | 10 | 107 | 29 | $7,607 | 7.8 |
 | [weather_disaster](weather/disaster.md) | 12 | 53 | 35 | $7,183 | 4.5 |
 | [world_russia_ukraine](world/russia_ukraine.md) | 9 | 49 | 18 | $6,770 | 5.0 |
 | [crypto_misc](crypto/misc.md) | 5 | 39 | 23 | $6,310 | 4.7 |
+| [sports_motor_f1](sports/motor_f1.md) | 7 | 52 | 52 | $5,792 | 4.7 |
+| [sports_cricket_odi](sports/cricket_odi.md) | 1 | 2 | 2 | $5,457 | 9.0 |
 | [eco_gdp](economics/gdp.md) | 21 | 387 | 157 | $4,973 | 9.2 |
 | [comm_precious_other](commodities/precious_other.md) | 3 | 120 | 109 | $4,932 | 16.7 |
 | [sports_soccer_kleague](sports/soccer_kleague.md) | 2 | 36 | 24 | $4,788 | 1.0 |
+| [sports_rugby_nrl](sports/rugby_nrl.md) | 2 | 32 | 32 | $3,629 | 51.7 |
 | [eco_jobs](economics/jobs.md) | 7 | 432 | 185 | $3,529 | 4.7 |
 | [companies_ma](companies/ma.md) | 3 | 25 | 10 | $2,789 | 3.7 |
 | [health_misc](health/misc.md) | 7 | 31 | 27 | $2,787 | 7.8 |
 | [tech_ai](tech/ai.md) | 10 | 53 | 28 | $2,186 | 5.0 |
+| [sports_cricket_t20_misc](sports/cricket_t20_misc.md) | 1 | 7 | 7 | $1,860 | 47.7 |
+| [sports_esports_overwatch](sports/esports_overwatch.md) | 1 | 6 | 6 | $1,850 | 14.0 |
+| [sports_esports_lol](sports/esports_lol.md) | 1 | 36 | 36 | $1,573 | 22.7 |
 | [sports_squash](sports/squash.md) | 1 | 126 | 5 | $1,424 | 1.3 |
 | [fin_rates](financials/rates.md) | 8 | 107 | 30 | $1,280 | 11.3 |
 | [world_china](world/china.md) | 7 | 29 | 19 | $1,249 | 4.3 |
@@ -81,8 +97,15 @@ Total active subsectors: 82
 | [sports_soccer_belgian](sports/soccer_belgian.md) | 2 | 43 | 29 | $372 | 47.0 |
 | [fin_fx](financials/fx.md) | 3 | 40 | 5 | $306 | 57.0 |
 | [pol_religion](politics/religion.md) | 3 | 20 | 8 | $163 | 3.7 |
+| [sports_rugby_top14](sports/rugby_top14.md) | 1 | 3 | 3 | $128 | 70.7 |
+| [sports_rugby_esl](sports/rugby_esl.md) | 1 | 3 | 3 | $100 | 32.7 |
 | [fin_misc](financials/misc.md) | 2 | 2 | 2 | $36 | 3.5 |
+| [sports_esports_r6](sports/esports_r6.md) | 1 | 8 | 8 | $36 | 92.3 |
+| [sports_soccer_dfb](sports/soccer_dfb.md) | 2 | 4 | 4 | $20 | 36.7 |
 | [sports_tennis_grandslam](sports/tennis_grandslam.md) | 1 | 1 | 1 | $10 | 9.0 |
+| [climate_ev](weather/ev.md) | 1 | 4 | 4 | $3 | 4.3 |
 | [eco_ppi](economics/ppi.md) | 1 | 12 | 8 | $1 | 51.7 |
 | [ent_tv_reality](entertainment/tv_reality.md) | 2 | 2 | 2 | $0 | 6.5 |
 | [sports_soccer_eredivisie](sports/soccer_eredivisie.md) | 2 | 21 | 3 | $0 | 3.7 |
+| [sports_esports_misc](sports/esports_misc.md) | 1 | 1 | 1 | $0 | 8.0 |
+| [sports_motor_motogp](sports/motor_motogp.md) | 2 | 5 | 5 | $0 | 7.4 |
