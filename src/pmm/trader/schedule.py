@@ -25,10 +25,31 @@ log = logging.getLogger(__name__)
 
 # ---- Ticker parsers -----------------------------------------------------
 
-_KBO_RE = re.compile(r"KXKBOGAME-(\d{2})([A-Z]{3})(\d{2})(\d{4})")  # yyMMMdd HHMM
-_NPB_RE = re.compile(r"KXNPBGAME-(\d{2})([A-Z]{3})(\d{2})(\d{4})?")  # optional time
+_KBO_RE = re.compile(r"KXKBOGAME-(\d{2})([A-Z]{3})(\d{2})(\d{4})")
+_NPB_RE = re.compile(r"KXNPBGAME-(\d{2})([A-Z]{3})(\d{2})(\d{4})?")
 _IPL_RE = re.compile(r"KXIPLGAME-(\d{2})([A-Z]{3})(\d{2})")
 _PSL_RE = re.compile(r"KXPSLGAME-(\d{2})([A-Z]{3})(\d{2})")
+# Esports: KXVALORANTGAME-26APR191400ATTAXDOR-..., time encoded as HHMM
+_VAL_RE = re.compile(r"KXVALORANTGAME-(\d{2})([A-Z]{3})(\d{2})(\d{4})")
+_CS2_RE = re.compile(r"KXCS2GAME-(\d{2})([A-Z]{3})(\d{2})(\d{4})")
+_DOTA_RE = re.compile(r"KXDOTA2MAP-(\d{2})([A-Z]{3})(\d{2})(\d{4})")
+_R6_RE = re.compile(r"KXR6GAME-(\d{2})([A-Z]{3})(\d{2})(\d{4})?")
+_OW_RE = re.compile(r"KXOWGAME-(\d{2})([A-Z]{3})(\d{2})(\d{4})?")
+# Cricket ODI / T20 match
+_CRICK_ODI_RE = re.compile(r"KXCRICKETODIMATCH-(\d{2})([A-Z]{3})(\d{2})")
+_CRICK_T20_RE = re.compile(r"KXT20MATCH-(\d{2})([A-Z]{3})(\d{2})")
+_CRICK_T20I_RE = re.compile(r"KXCRICKETT20IMATCH-(\d{2})([A-Z]{3})(\d{2})")
+# Tennis challenger: match time not in ticker; fallback to 12:00 UTC (avg)
+_TENNIS_RE = re.compile(r"KXATPCHALLENGERMATCH-(\d{2})([A-Z]{3})(\d{2})")
+_TENNIS_WTA_RE = re.compile(r"KXWTACHALLENGERMATCH-(\d{2})([A-Z]{3})(\d{2})")
+_TENNIS_ITF_RE = re.compile(r"KXITFMATCH-(\d{2})([A-Z]{3})(\d{2})")
+# Basketball ACB / CBA — game start time varies; conservative 12:00 UTC
+_ACB_RE = re.compile(r"KXACBGAME-(\d{2})([A-Z]{3})(\d{2})(\d{4})?")
+_CBA_RE = re.compile(r"KXCBAGAME-(\d{2})([A-Z]{3})(\d{2})(\d{4})?")
+# Soccer MLS
+_MLS_RE = re.compile(r"KXMLSGAME-(\d{2})([A-Z]{3})(\d{2})(\d{4})?")
+# Combat
+_UFC_RE = re.compile(r"KX[A-Z]*UFC[A-Z]*-(\d{2})([A-Z]{3})(\d{2})")
 
 _MONTHS = {
     "JAN": 1, "FEB": 2, "MAR": 3, "APR": 4, "MAY": 5, "JUN": 6,
@@ -36,41 +57,46 @@ _MONTHS = {
 }
 
 
+def _parse_yyMMMddHHMM(m, default_hhmm: tuple[int, int] = (12, 0)) -> datetime:
+    groups = m.groups()
+    yy, mon, dd = groups[:3]
+    hhmm = groups[3] if len(groups) > 3 else None
+    y = 2000 + int(yy); mo = _MONTHS[mon]; d = int(dd)
+    if hhmm:
+        hh = int(hhmm[:2]); mm = int(hhmm[2:])
+    else:
+        hh, mm = default_hhmm
+    return datetime(y, mo, d, hh, mm, tzinfo=timezone.utc)
+
+
 def parse_game_start_utc(ticker: str, close_time: datetime | None) -> datetime | None:
     """Extract game start in UTC from ticker, fallback to subsector default.
     Returns None if cannot determine."""
-    # KBO
-    m = _KBO_RE.match(ticker)
-    if m:
-        yy, mon, dd, hhmm = m.groups()
-        y = 2000 + int(yy)
-        mo = _MONTHS[mon]
-        d = int(dd)
-        hh = int(hhmm[:2])
-        mm = int(hhmm[2:])
-        return datetime(y, mo, d, hh, mm, tzinfo=timezone.utc)
-    # NPB (if time present)
-    m = _NPB_RE.match(ticker)
-    if m:
-        yy, mon, dd, hhmm = m.groups()
-        y = 2000 + int(yy); mo = _MONTHS[mon]; d = int(dd)
-        if hhmm:
-            hh = int(hhmm[:2]); mm = int(hhmm[2:])
-        else:
-            hh, mm = 10, 0  # default 10 UTC (~19 JST)
-        return datetime(y, mo, d, hh, mm, tzinfo=timezone.utc)
-    # IPL
-    m = _IPL_RE.match(ticker)
-    if m:
-        yy, mon, dd = m.groups()
-        y = 2000 + int(yy); mo = _MONTHS[mon]; d = int(dd)
-        return datetime(y, mo, d, 14, 0, tzinfo=timezone.utc)
-    # PSL
-    m = _PSL_RE.match(ticker)
-    if m:
-        yy, mon, dd = m.groups()
-        y = 2000 + int(yy); mo = _MONTHS[mon]; d = int(dd)
-        return datetime(y, mo, d, 15, 0, tzinfo=timezone.utc)
+    # Order matters: more-specific patterns first.
+    for pat, default in [
+        (_KBO_RE, (5, 30)),
+        (_NPB_RE, (10, 0)),
+        (_IPL_RE, (14, 0)),
+        (_PSL_RE, (15, 0)),
+        (_VAL_RE, (12, 0)),
+        (_CS2_RE, (12, 0)),
+        (_DOTA_RE, (12, 0)),
+        (_R6_RE, (12, 0)),
+        (_OW_RE, (18, 0)),
+        (_CRICK_T20I_RE, (12, 0)),
+        (_CRICK_T20_RE, (12, 0)),
+        (_CRICK_ODI_RE, (8, 0)),
+        (_TENNIS_RE, (12, 0)),
+        (_TENNIS_WTA_RE, (12, 0)),
+        (_TENNIS_ITF_RE, (12, 0)),
+        (_ACB_RE, (18, 0)),
+        (_CBA_RE, (11, 0)),  # CBA = China Basketball, 11 UTC = 19 Beijing
+        (_MLS_RE, (23, 0)),
+        (_UFC_RE, (2, 0)),   # UFC main cards ~22-02 UTC
+    ]:
+        m = pat.match(ticker)
+        if m:
+            return _parse_yyMMMddHHMM(m, default_hhmm=default)
     return None
 
 

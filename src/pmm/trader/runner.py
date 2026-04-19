@@ -56,6 +56,9 @@ class TraderRunner:
             self.executor = LiveExecutor(client=client, portfolio=self.portfolio)
         self._stop = False
         self._adverse_fills = 0
+        # Cache for per-subsector tuning to avoid recomputation
+        from pmm.trader.subsector_tuning import TUNING
+        sub_tuning_cache = {}  # kept local; populated in run()
         # Universe cache: discover_markets is expensive (O(N series) API calls).
         # Cache the result and only refresh every ~300s.
         self._universe_cache: list = []
@@ -168,6 +171,42 @@ class TraderRunner:
                 if is_in_blackout(m.subsector, now.hour, now.weekday()):
                     self.executor.cancel_all(m.ticker)
                     continue
+
+                # Dynamic price-discovery gate: pull recent trades, measure
+                # mean abs consecutive-trade move in the last 1 hour. If it
+                # exceeds the per-subsector threshold, skip quoting — the
+                # market is in price-discovery mode (news, live event, etc).
+                try:
+                    tresp = self.client.get_trades(ticker=m.ticker, limit=50)
+                    trades = tresp.get("trades", []) or []
+                    from datetime import timedelta
+                    cutoff = now - timedelta(hours=1)
+                    recent = []
+                    for t in trades:
+                        ct = t.get("created_time")
+                        if not ct:
+                            continue
+                        try:
+                            ts = datetime.fromisoformat(ct.replace("Z", "+00:00"))
+                        except Exception:
+                            continue
+                        if ts >= cutoff:
+                            try:
+                                px = float(t.get("yes_price_dollars") or 0)
+                            except Exception:
+                                continue
+                            recent.append(px)
+                    if len(recent) >= 3:
+                        diffs = [abs(recent[i] - recent[i + 1]) * 100 for i in range(len(recent) - 1)]
+                        mean_abs_move_c = sum(diffs) / len(diffs)
+                        threshold = get_tuning(m.subsector).max_recent_vol_c
+                        if mean_abs_move_c > threshold:
+                            self.executor.cancel_all(m.ticker)
+                            log.info("SKIP %s: recent vol %.2fc > threshold %.2fc (%d trades in last 1h)",
+                                     m.ticker, mean_abs_move_c, threshold, len(recent))
+                            continue
+                except Exception:
+                    pass
 
                 # Risk assessment
                 decision = assess_market(self.portfolio, m.ticker, m.subsector, m.mid, mids,

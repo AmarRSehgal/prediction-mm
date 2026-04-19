@@ -20,14 +20,18 @@ class SubsectorTuning:
     blackout_utc_hours: tuple[int, ...] = ()
     # UTC days of week (0=Mon, 6=Sun) where we skip (0-indexed)
     blackout_utc_dow: tuple[int, ...] = ()
+    # Dynamic: skip market if realized abs-move per trade in last hour
+    # exceeds this (in cents). Detects price-discovery / info-release
+    # regardless of schedule. Lower for quieter subsectors.
+    max_recent_vol_c: float = 4.0  # default: skip if > 4c mean abs move / trade
 
 
 TUNING: dict[str, SubsectorTuning] = {
     # Low-toxicity, wide spreads, predictable game schedule -> tighter gamma
-    "sports_baseball_kbo": SubsectorTuning(gamma=10.0, max_markets=30),
-    "sports_baseball_npb": SubsectorTuning(gamma=10.0, max_markets=30),
-    "sports_cricket_psl":  SubsectorTuning(gamma=12.0, max_markets=30),
-    "sports_tennis_challenger": SubsectorTuning(gamma=12.0, max_markets=30),
+    "sports_baseball_kbo": SubsectorTuning(gamma=10.0, max_markets=30, max_recent_vol_c=3.0),
+    "sports_baseball_npb": SubsectorTuning(gamma=10.0, max_markets=30, max_recent_vol_c=3.0),
+    "sports_cricket_psl":  SubsectorTuning(gamma=12.0, max_markets=30, max_recent_vol_c=3.0),
+    "sports_tennis_challenger": SubsectorTuning(gamma=12.0, max_markets=30, max_recent_vol_c=3.0),
 
     # Moderate: standard gamma, more markets
     "sports_baseball_us":  SubsectorTuning(gamma=20.0, max_markets=40),
@@ -43,7 +47,13 @@ TUNING: dict[str, SubsectorTuning] = {
     "sports_esports_dota": SubsectorTuning(gamma=18.0, max_markets=20),
 
     # High toxicity / large moves -> higher gamma (wider/safer)
-    "sports_combat":       SubsectorTuning(gamma=35.0, max_markets=15),
+    "sports_combat":       SubsectorTuning(gamma=35.0, max_markets=15, max_recent_vol_c=5.0),
+
+    # Multi-day tournament sports — reinstate with STRICT vol gate.
+    # During inactive weeks, vol is low; during tournament, vol explodes.
+    # 2.5c threshold will keep us out during the event.
+    "sports_golf":         SubsectorTuning(gamma=25.0, max_markets=20, max_recent_vol_c=2.5),
+    "sports_golf_tgl":     SubsectorTuning(gamma=25.0, max_markets=15, max_recent_vol_c=2.5),
 
     # Commodities: blackout US equity open + close-hour + EIA time
     "comm_energy":         SubsectorTuning(
