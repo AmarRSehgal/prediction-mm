@@ -25,7 +25,9 @@ TARGET_SUBSECTORS: tuple[str, ...] = (
     "sports_esports_valorant",
     "sports_esports_cs2",
     "sports_esports_dota",
-    "sports_golf",
+    # sports_golf: REMOVED — in-tournament player-prop markets lost $8.45 when
+    # flattened at current TOB. Top-N of 100-player field = asymmetric payoff.
+    # Only safe off-tournament, and then flow is near zero.
     # Commodities
     "comm_energy",
     "comm_gold",
