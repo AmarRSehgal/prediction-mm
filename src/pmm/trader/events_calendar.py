@@ -78,6 +78,32 @@ EVENTS: list[Event] = [
         start_utc=_dt(2026, 5, 9, 22, 0),   # Sat evening US
         end_utc=_dt(2026, 5, 10, 6, 0),     # Sun morning UTC
     ),
+    Event(
+        name="Mike Tyson vs Floyd Mayweather boxing",
+        subsectors=("sports_combat",),
+        start_utc=_dt(2026, 4, 25, 22, 0),  # Sat evening US
+        end_utc=_dt(2026, 4, 26, 6, 0),
+    ),
+
+    # ---- PSL playoffs + final --------------------------------------------
+    Event(
+        name="PSL 2026 Qualifier 1",
+        subsectors=("sports_cricket_psl",),
+        start_utc=_dt(2026, 4, 28, 13, 0),  # Pakistan evening
+        end_utc=_dt(2026, 4, 28, 19, 0),
+    ),
+    Event(
+        name="PSL 2026 Eliminators 1 and 2",
+        subsectors=("sports_cricket_psl",),
+        start_utc=_dt(2026, 4, 29, 9, 0),
+        end_utc=_dt(2026, 4, 29, 20, 0),
+    ),
+    Event(
+        name="PSL 2026 Final",
+        subsectors=("sports_cricket_psl",),
+        start_utc=_dt(2026, 5, 3, 13, 0),
+        end_utc=_dt(2026, 5, 3, 19, 0),
+    ),
 
     # ---- Earnings ---------------------------------------------------------
     Event(
@@ -106,8 +132,14 @@ EVENTS: list[Event] = [
     Event(
         name="US PPI - May release",
         subsectors=("eco_ppi", "eco_fed"),
-        start_utc=_dt(2026, 5, 14, 13, 0),
+        start_utc=_dt(2026, 5, 14, 13, 0),  # day after CPI typically
         end_utc=_dt(2026, 5, 14, 16, 0),
+    ),
+    Event(
+        name="US GDP Advance Q1 - Apr 30 release",
+        subsectors=("eco_gdp", "eco_fed", "comm_gold"),
+        start_utc=_dt(2026, 4, 30, 13, 0),
+        end_utc=_dt(2026, 4, 30, 16, 0),
     ),
     # FOMC April meeting (Apr 28-29), May meeting typically mid-June
     Event(
