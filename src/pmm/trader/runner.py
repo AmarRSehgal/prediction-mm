@@ -25,6 +25,7 @@ from pmm.trader.position import Portfolio, load_portfolio, save_portfolio
 from pmm.trader.quoter import compute_quote
 from pmm.trader.risk import assess_market
 from pmm.trader.schedule import compute_window
+from pmm.trader.events_calendar import is_subsector_blacked_out_by_calendar
 from pmm.trader.subsector_tuning import get as get_tuning, is_in_blackout
 from pmm.trader.universe import discover_markets
 
@@ -169,6 +170,12 @@ class TraderRunner:
 
                 # Per-subsector UTC-hour blackout (scheduled release / open / close)
                 if is_in_blackout(m.subsector, now.hour, now.weekday()):
+                    self.executor.cancel_all(m.ticker)
+                    continue
+
+                # Calendar-based event blackout (known tournaments / earnings / releases)
+                blocked, reason = is_subsector_blacked_out_by_calendar(m.subsector, now)
+                if blocked:
                     self.executor.cancel_all(m.ticker)
                     continue
 
