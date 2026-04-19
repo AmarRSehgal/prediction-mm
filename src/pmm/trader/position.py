@@ -55,18 +55,20 @@ class MarketPosition:
                 self.avg_cost_dollars = (self.avg_cost_dollars * self.yes_contracts + price * delta) / new_qty
             self.yes_contracts = new_qty
         else:
-            # Closing / flipping
+            # Closing / flipping.
+            # For a long (direction=+1) closed at price: realized = (price - cost) per contract.
+            # For a short (direction=-1) closed at price: realized = (cost - price) per contract
+            #   which equals direction * (price - cost) with direction = -1.
             close_qty = min(abs(delta), abs(self.yes_contracts))
             direction = 1 if self.yes_contracts > 0 else -1
-            realized_per_contract = direction * (price - self.avg_cost_dollars) * (-1 if delta > 0 else 1)
-            # simplification: realized = (exit_price - cost_basis) * qty * direction
+            realized_per_contract = direction * (price - self.avg_cost_dollars)
             self.realized_pnl += realized_per_contract * close_qty
-            remaining_delta = delta + direction * close_qty  # what remains after closing
             self.yes_contracts += delta
-            if self.yes_contracts != 0 and remaining_delta != 0:
-                self.avg_cost_dollars = price
-            elif self.yes_contracts == 0:
+            if self.yes_contracts == 0:
                 self.avg_cost_dollars = 0.0
+            else:
+                # If we flipped direction (closed all and opened new), reset cost basis
+                self.avg_cost_dollars = price
 
     def exposure_dollars(self, mid: float) -> float:
         """Dollar value at risk at current mid."""

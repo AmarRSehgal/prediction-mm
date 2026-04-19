@@ -16,10 +16,7 @@ while (( $(date +%s) < DEADLINE )); do
   .venv/bin/python scripts/run_trader.py --duration "${remaining}" >> logs/overnight_trader.log 2>&1
   rc=$?
   echo "[$(date -u +%FT%TZ)] trader exited rc=${rc}"
-  if (( rc == 0 )); then
-    echo "[$(date -u +%FT%TZ)] clean exit, not restarting"
-    break
-  fi
+  # Always restart until deadline; clean-exit is still a restart trigger.
   restarts=$(( restarts + 1 ))
   if (( restarts > MAX_RESTARTS )); then
     echo "[$(date -u +%FT%TZ)] giving up after ${MAX_RESTARTS} restarts"

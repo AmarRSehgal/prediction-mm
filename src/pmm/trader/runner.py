@@ -63,22 +63,44 @@ class TraderRunner:
         signal.signal(signal.SIGINT, _h)
         signal.signal(signal.SIGTERM, _h)
 
-    def flatten_market(self, ticker: str, subsector: str, mid: float) -> None:
-        """Cross the spread to exit inventory if we can't MM our way out."""
+    def flatten_market(self, ticker: str, subsector: str,
+                       mid: float, yes_bid: float | None = None, yes_ask: float | None = None) -> None:
+        """Cross the spread to exit inventory. In paper mode we simulate a taker
+        fill at the appropriate TOB price; in live mode we place a marketable
+        limit order."""
         pos = self.portfolio.position(ticker, subsector)
         qty = pos.yes_contracts
         if qty == 0:
             return
         if isinstance(self.executor, PaperExecutor):
-            log.info("PAPER FLATTEN %s inv=%d at mid $%.2f (skipping real execution)", ticker, qty, mid)
+            # Simulate: we TAKE the existing bid (to sell) or ask (to buy).
+            # Price we receive: yes_bid (if long exit) or yes_ask (if short exit).
+            from pmm.trader.position import Fill
+            import uuid
+            from datetime import datetime, timezone
+            exit_price = None
+            if qty > 0:
+                # Sell qty at yes_bid (conservative: assume we hit the bid)
+                exit_price = yes_bid if yes_bid is not None else mid - 0.01
+                action = "sell"
+            else:
+                exit_price = yes_ask if yes_ask is not None else mid + 0.01
+                action = "buy"
+            fill = Fill(
+                ts=datetime.now(tz=timezone.utc).isoformat(),
+                ticker=ticker, side="yes", action=action,
+                count=abs(qty), price_dollars=exit_price,
+                order_id=f"paper-flatten-{uuid.uuid4()}",
+            )
+            pos.add_fill(fill)
+            log.info("PAPER FLATTEN %s: %s %d contracts @ $%.2f -> inv=%d realized=$%.4f",
+                     ticker, action, abs(qty), exit_price, pos.yes_contracts, pos.realized_pnl)
             return
         # Live: place a marketable limit at the far side
         if qty > 0:
-            # Sell YES at bid
             intent = OrderIntent(ticker=ticker, side="yes", action="sell",
                                  count=abs(qty), price_cents=max(1, int(mid * 100) - 2), post_only=False)
         else:
-            # Buy YES at ask
             intent = OrderIntent(ticker=ticker, side="yes", action="buy",
                                  count=abs(qty), price_cents=min(99, int(mid * 100) + 2), post_only=False)
         self.executor.place_order(intent, subsector)
@@ -127,7 +149,8 @@ class TraderRunner:
                 if win.state in ("EXIT", "CLOSED"):
                     self.executor.cancel_all(m.ticker)
                     if pos.yes_contracts != 0 and win.state == "EXIT":
-                        self.flatten_market(m.ticker, m.subsector, m.mid)
+                        self.flatten_market(m.ticker, m.subsector, m.mid,
+                                             yes_bid=m.yes_bid, yes_ask=m.yes_ask)
                     continue
 
                 # Risk assessment
@@ -153,7 +176,27 @@ class TraderRunner:
                     min_spread_cents=self.tcfg.risk.min_spread_cents,
                 )
 
-                # Cancel-then-post cycle
+                # IMPORTANT: check fills against OLD orders first. If we cancel
+                # before checking, any trade in the inter-cycle gap gets skipped
+                # because new orders have ts > trade ts.
+                if isinstance(self.executor, PaperExecutor):
+                    try:
+                        ob = self.client.get_orderbook(m.ticker, depth=5)
+                        book = ob.get("orderbook_fp") or {}
+                        yes_levels = book.get("yes_dollars") or []
+                        no_levels = book.get("no_dollars") or []
+                        yes_tob_sz = float(yes_levels[-1][1]) if yes_levels else 0.0
+                        no_tob_sz = float(no_levels[-1][1]) if no_levels else 0.0
+                        self.executor.record_tob(m.ticker, yes_tob_sz, no_tob_sz)
+                    except Exception:
+                        pass
+                    yb_c = int(round(m.yes_bid * 100))
+                    ya_c = int(round(m.yes_ask * 100))
+                    self.executor.try_fill_against(m.ticker, m.subsector, yb_c, ya_c)
+                else:
+                    self.executor.reconcile_fills(m.ticker, m.subsector)
+
+                # Now cancel + repost
                 self.executor.cancel_all(m.ticker)
 
                 if decision.can_quote_bid and quote.bid_size > 0:
@@ -172,25 +215,6 @@ class TraderRunner:
                         post_only=True,
                     )
                     self.executor.place_order(intent, m.subsector)
-
-                # Fill simulation / reconciliation
-                if isinstance(self.executor, PaperExecutor):
-                    # Fetch TOB sizes to estimate queue position (via orderbook call).
-                    try:
-                        ob = self.client.get_orderbook(m.ticker, depth=5)
-                        book = ob.get("orderbook_fp") or {}
-                        yes_levels = book.get("yes_dollars") or []
-                        no_levels = book.get("no_dollars") or []
-                        yes_tob_sz = float(yes_levels[-1][1]) if yes_levels else 0.0
-                        no_tob_sz = float(no_levels[-1][1]) if no_levels else 0.0
-                        self.executor.record_tob(m.ticker, yes_tob_sz, no_tob_sz)
-                    except Exception:
-                        pass
-                    yb_c = int(round(m.yes_bid * 100))
-                    ya_c = int(round(m.yes_ask * 100))
-                    self.executor.try_fill_against(m.ticker, m.subsector, yb_c, ya_c)
-                else:
-                    self.executor.reconcile_fills(m.ticker, m.subsector)
 
             # 4. Persist state
             save_portfolio(self.portfolio, self.state_path)
