@@ -31,7 +31,7 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--live", action="store_true", help="REAL ORDERS. Default is paper.")
     ap.add_argument("--duration", type=float, default=None, help="run time in seconds (default forever)")
-    ap.add_argument("--capital", type=float, default=100.0, help="starting capital in dollars")
+    ap.add_argument("--capital", type=float, default=None, help="starting capital in dollars (overrides config)")
     ap.add_argument("--subsectors", nargs="*", default=None, help="override target subsectors")
     args = ap.parse_args()
 
@@ -52,8 +52,7 @@ def main() -> int:
     series_df["subsector"] = series_df.apply(lambda r: classify(r["ticker"] or "", r["title"] or ""), axis=1)
 
     tcfg = TraderConfig(dry_run=not args.live)
-    # capital override
-    if args.capital != tcfg.risk.capital_dollars:
+    if args.capital is not None:
         from dataclasses import replace
         tcfg = replace(tcfg, risk=replace(tcfg.risk, capital_dollars=args.capital))
     if args.subsectors:

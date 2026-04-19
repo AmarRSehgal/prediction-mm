@@ -41,8 +41,8 @@ def discover_markets(
     target_subsectors: tuple[str, ...],
     series_df: pd.DataFrame,
     price_band: tuple[float, float] = (0.15, 0.85),
-    max_hours_to_close: float = 168.0,
-    max_per_subsector: int = 10,
+    max_hours_to_close: float = 720.0,  # 30 days
+    max_per_subsector: int = 20,
 ) -> list[MarketInfo]:
     """Return every open contested market whose subsector is in target_subsectors."""
     series_df = series_df.copy()
@@ -51,7 +51,23 @@ def discover_markets(
             lambda r: classify(r["ticker"] or "", r["title"] or ""), axis=1
         )
     targets = series_df[series_df["subsector"].isin(target_subsectors)]
-    log.info("universe: %d target-sub series to scan", len(targets))
+    # Pre-filter to series known to have recent open markets (from sector_scan).
+    # This cuts API load 5-10x vs scanning every series in every subsector.
+    try:
+        import os
+        scan_path = os.path.join(os.path.dirname(__file__), "..", "..", "..", "research", "data", "sector_scan_series.parquet")
+        scan_path = os.path.abspath(scan_path)
+        if os.path.exists(scan_path):
+            scan = pd.read_parquet(scan_path)
+            active_series = set(scan[scan["n_contested"].fillna(0) > 0]["series"].tolist())
+            before = len(targets)
+            targets = targets[targets["ticker"].isin(active_series)]
+            log.info("universe: %d target-sub series scanned down to %d with known open markets", before, len(targets))
+        else:
+            log.info("universe: %d target-sub series to scan (no scan cache)", len(targets))
+    except Exception as e:
+        log.warning("series pre-filter failed: %s — scanning all", e)
+        log.info("universe: %d target-sub series to scan", len(targets))
 
     out: list[MarketInfo] = []
     lo, hi = price_band
@@ -86,15 +102,21 @@ def discover_markets(
                 vol_24h=float(m.get("volume_24h_fp") or 0),
                 oi=float(m.get("open_interest_fp") or 0),
             ))
-    # Cap per subsector to avoid API-rate overruns
+    # Cap per subsector. Uses per-subsector tuning if available, falling back
+    # to max_per_subsector default.
+    try:
+        from pmm.trader.subsector_tuning import get as get_tuning
+    except Exception:
+        get_tuning = None
     if max_per_subsector > 0:
         by_sub: dict[str, list[MarketInfo]] = {}
         for m in out:
             by_sub.setdefault(m.subsector, []).append(m)
         trimmed: list[MarketInfo] = []
         for sub, lst in by_sub.items():
+            cap = get_tuning(sub).max_markets if get_tuning else max_per_subsector
             lst.sort(key=lambda x: x.oi, reverse=True)
-            trimmed.extend(lst[:max_per_subsector])
+            trimmed.extend(lst[:cap])
         out = trimmed
     log.info("universe: %d contested markets in target subsectors", len(out))
     return out

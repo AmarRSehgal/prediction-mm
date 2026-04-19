@@ -25,6 +25,7 @@ from pmm.trader.position import Portfolio, load_portfolio, save_portfolio
 from pmm.trader.quoter import compute_quote
 from pmm.trader.risk import assess_market
 from pmm.trader.schedule import compute_window
+from pmm.trader.subsector_tuning import get as get_tuning, is_in_blackout
 from pmm.trader.universe import discover_markets
 
 log = logging.getLogger(__name__)
@@ -55,6 +56,11 @@ class TraderRunner:
             self.executor = LiveExecutor(client=client, portfolio=self.portfolio)
         self._stop = False
         self._adverse_fills = 0
+        # Universe cache: discover_markets is expensive (O(N series) API calls).
+        # Cache the result and only refresh every ~300s.
+        self._universe_cache: list = []
+        self._universe_cached_at: float = 0.0
+        self._universe_refresh_seconds: float = 300.0
 
     def _install_signals(self):
         def _h(signum, frame):
@@ -116,15 +122,20 @@ class TraderRunner:
             cycle_start = time.monotonic()
             cycle += 1
 
-            # 1. Universe
-            try:
-                universe = discover_markets(
-                    self.client, self.tcfg.target_subsectors, self.series_df,
-                )
-            except Exception:
-                log.exception("universe discovery failed")
-                time.sleep(self.tcfg.risk.quote_refresh_seconds)
-                continue
+            # 1. Universe (cached — refresh every _universe_refresh_seconds)
+            if (time.monotonic() - self._universe_cached_at) > self._universe_refresh_seconds or not self._universe_cache:
+                try:
+                    universe = discover_markets(
+                        self.client, self.tcfg.target_subsectors, self.series_df,
+                    )
+                    self._universe_cache = universe
+                    self._universe_cached_at = time.monotonic()
+                except Exception:
+                    log.exception("universe discovery failed")
+                    time.sleep(self.tcfg.risk.quote_refresh_seconds)
+                    continue
+            else:
+                universe = self._universe_cache
 
             mids = {m.ticker: m.mid for m in universe}
             now = datetime.now(tz=timezone.utc)
@@ -153,6 +164,11 @@ class TraderRunner:
                                              yes_bid=m.yes_bid, yes_ask=m.yes_ask)
                     continue
 
+                # Per-subsector UTC-hour blackout (scheduled release / open / close)
+                if is_in_blackout(m.subsector, now.hour, now.weekday()):
+                    self.executor.cancel_all(m.ticker)
+                    continue
+
                 # Risk assessment
                 decision = assess_market(self.portfolio, m.ticker, m.subsector, m.mid, mids,
                                          self.tcfg.risk, kill=killed)
@@ -164,6 +180,11 @@ class TraderRunner:
                 if win.state == "QUIET":
                     tte_hours_to_exit = min(tte_hours_to_exit, 6.0)  # force tighter/widened reservation
 
+                # Per-subsector gamma override
+                sub_tuning = get_tuning(m.subsector)
+                from dataclasses import replace
+                as_params = replace(self.tcfg.as_params, gamma=sub_tuning.gamma)
+
                 quote = compute_quote(
                     mid_dollars=m.mid,
                     inventory_contracts=pos.yes_contracts,
@@ -172,7 +193,7 @@ class TraderRunner:
                     current_ask_dollars=m.yes_ask,
                     sigma_cents=sigma_c,
                     order_size=decision.max_order_size,
-                    params=self.tcfg.as_params,
+                    params=as_params,
                     min_spread_cents=self.tcfg.risk.min_spread_cents,
                 )
 

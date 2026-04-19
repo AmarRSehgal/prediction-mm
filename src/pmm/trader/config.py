@@ -1,16 +1,57 @@
-"""Trader configuration. Deliberately conservative for $100 capital v0."""
+"""Trader configuration. Sunday test: broad universe, ~$5 per market."""
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 
 
 # ---- Target universe ----------------------------------------------------
-# Based on the comprehensive sweep: subsectors with wide spreads, decent depth,
-# low informed-flow magnitude, and predictable schedules.
+# Broad curated list of subsectors with wide spreads + moderate+ depth + low
+# toxicity, per the overnight sector scan. Explicitly excludes HFT-saturated
+# and playoff-heavy subsectors (see docs/subsectors/INDEX.md for rationale).
 TARGET_SUBSECTORS: tuple[str, ...] = (
+    # Sports (niche / wide-spread)
     "sports_baseball_kbo",
     "sports_baseball_npb",
+    "sports_baseball_us",
+    "sports_cricket_ipl",
     "sports_cricket_psl",
+    "sports_cricket_odi",
+    "sports_cricket_t20_misc",
+    "sports_soccer_mls",
+    "sports_tennis_challenger",
+    "sports_basketball_cba",
+    "sports_basketball_acb",
+    "sports_combat",
+    "sports_esports_valorant",
+    "sports_esports_cs2",
+    "sports_esports_dota",
+    "sports_golf",
+    # Commodities
+    "comm_energy",
+    "comm_gold",
+    "comm_precious_other",
+    "comm_metals_industrial",
+    "comm_agri",
+    # Economics (wide spreads; quiet windows between releases)
+    "eco_cpi",
+    "eco_ppi",
+    "eco_jobs",
+    "eco_fed",
+    "eco_gdp",
+    # Entertainment (surprise wide-spread finds)
+    "ent_music",
+    "ent_awards",
+    "ent_tv_reality",
+    # Politics (niche / slow-moving)
+    "pol_fiscal",
+    "pol_confirmation",
+    # Companies / tech
+    "companies_earnings",
+    "companies_ipo",
+    "tech_ev_tesla",
+    "tech_space",
+    # World / geopolitics
+    "world_mideast",
 )
 
 # Price band we will ever quote in — avoid extreme-probability tails.
@@ -21,11 +62,15 @@ PRICE_BAND_HIGH = 0.85
 # ---- Risk limits (dollars / contracts) ----------------------------------
 @dataclass(frozen=True)
 class RiskLimits:
-    capital_dollars: float = 100.0
-    # Fraction of capital that can be exposed at any time
-    total_exposure_frac: float = 0.50    # $50 max live exposure
-    per_market_frac: float = 0.05        # $5 max per contract-ticker
-    per_subsector_frac: float = 0.20     # $20 max per subsector
+    # Nominal capital for display; fractions below are set so that effectively
+    # the only binding constraint is the per-market cap of $5.
+    capital_dollars: float = 1000.0
+
+    # Effectively disable total / per-subsector caps for the Sunday test —
+    # we want to see deployed capital grow organically.
+    total_exposure_frac: float = 100.0   # disable
+    per_subsector_frac: float = 100.0    # disable
+    per_market_frac: float = 0.005       # = $5 per market
 
     # Order sizing (integer contracts)
     default_order_size: int = 2
@@ -33,11 +78,11 @@ class RiskLimits:
     max_inventory_per_market: int = 5
 
     # Quote rules
-    min_spread_cents: int = 3            # never quote tighter than 3c
+    min_spread_cents: int = 3
     quote_refresh_seconds: float = 15.0
 
     # Kill switches
-    daily_stop_loss_dollars: float = 10.0
+    daily_stop_loss_dollars: float = 50.0
     max_consecutive_adverse_fills: int = 5
     staleness_cutoff_seconds: float = 30.0
 
@@ -45,21 +90,17 @@ class RiskLimits:
 # ---- Avellaneda-Stoikov parameters --------------------------------------
 @dataclass(frozen=True)
 class ASParams:
-    gamma: float = 20.0              # high risk aversion for small account
-    sigma_floor_c: float = 2.0       # minimum vol estimate in cents
+    gamma: float = 20.0
+    sigma_floor_c: float = 2.0
     sigma_window_minutes: int = 30
-    inventory_skew_coef: float = 0.02  # additional skew per unit inventory (dollars)
+    inventory_skew_coef: float = 0.02
 
 
 # ---- Schedule / TTE rules ----------------------------------------------
 @dataclass(frozen=True)
 class ScheduleRules:
-    # Don't quote if close is within this many hours. Conservative.
-    # For sports we'll exit earlier via game-time detection; this is the floor.
     exit_tte_hours: float = 30.0
-    # Reduce size / widen once TTE crosses this; pull at exit_tte_hours.
     widen_tte_hours: float = 48.0
-    # Absolute minimum time-since-open before we will quote (stale-market trap)
     min_age_hours: float = 0.5
 
 
@@ -69,4 +110,4 @@ class TraderConfig:
     as_params: ASParams = field(default_factory=ASParams)
     schedule: ScheduleRules = field(default_factory=ScheduleRules)
     target_subsectors: tuple[str, ...] = TARGET_SUBSECTORS
-    dry_run: bool = True             # DEFAULT OFF — live requires explicit flag
+    dry_run: bool = True
