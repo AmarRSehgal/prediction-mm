@@ -32,16 +32,16 @@ from pmm.config import Config
 
 def snapshot(state_path: Path) -> tuple[dict, dict]:
     if not state_path.exists():
-        return ({"starting": 1000, "account_value": 1000, "realized": 0, "unrealized": 0,
+        return ({"starting": 10000, "account_value": 10000, "realized": 0, "unrealized": 0,
                  "cash_tied": 0, "open": 0, "tracked": 0, "fills": 0}, {})
     try:
         data = json.loads(state_path.read_text())
     except Exception:
-        return ({"starting": 1000, "account_value": 1000, "realized": 0, "unrealized": 0,
+        return ({"starting": 10000, "account_value": 10000, "realized": 0, "unrealized": 0,
                  "cash_tied": 0, "open": 0, "tracked": 0, "fills": 0}, {})
 
     positions = data.get("positions") or {}
-    starting = float(data.get("starting_cash", 1000))
+    starting = float(data.get("starting_cash", 10000))
 
     realized = sum(float(p.get("realized_pnl", 0.0)) for p in positions.values())
     unrealized = 0.0

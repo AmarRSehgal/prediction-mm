@@ -62,14 +62,14 @@ PRICE_BAND_HIGH = 0.85
 # ---- Risk limits (dollars / contracts) ----------------------------------
 @dataclass(frozen=True)
 class RiskLimits:
-    # Nominal capital for display; fractions below are set so that effectively
-    # the only binding constraint is the per-market cap of $5.
-    capital_dollars: float = 1000.0
+    # Starting capital for the Sunday-night session. 1509 markets at $5
+    # per-market cap = $7545 max theoretical exposure; $10K capital with
+    # 80% utilization gives $8000 headroom for full deployment.
+    capital_dollars: float = 10000.0
 
-    # Honor capital constraint: deployed cannot exceed capital.
-    total_exposure_frac: float = 0.80    # $800 of $1000 max live exposure
-    per_subsector_frac: float = 0.20     # $200 per subsector (prevents one hoarding)
-    per_market_frac: float = 0.005       # $5 per market (per-ticker inventory cap)
+    total_exposure_frac: float = 0.80    # $8000 of $10K max live exposure
+    per_subsector_frac: float = 0.10     # $1000 per subsector (bounds any one sector)
+    per_market_frac: float = 0.0005      # $5 per market
 
     # Order sizing (integer contracts)
     default_order_size: int = 2
@@ -80,8 +80,8 @@ class RiskLimits:
     min_spread_cents: int = 3
     quote_refresh_seconds: float = 15.0
 
-    # Kill switches
-    daily_stop_loss_dollars: float = 50.0
+    # Kill switches - scale with capital: 5% of starting = $500
+    daily_stop_loss_dollars: float = 500.0
     max_consecutive_adverse_fills: int = 5
     staleness_cutoff_seconds: float = 30.0
 

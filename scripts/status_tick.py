@@ -42,12 +42,12 @@ def count_log_events(log_path: Path) -> dict[str, int]:
 
 def portfolio_snapshot(state_path: Path) -> dict:
     if not state_path.exists():
-        return {"account_value": 1000, "realized": 0, "unrealized": 0,
+        return {"account_value": 10000, "realized": 0, "unrealized": 0,
                 "cash_tied": 0, "open": 0, "tracked": 0, "fills": 0,
                 "best_sub": [], "worst_sub": []}
     data = json.loads(state_path.read_text())
     positions = data.get("positions") or {}
-    starting = float(data.get("starting_cash", 1000))
+    starting = float(data.get("starting_cash", 10000))
 
     realized = 0.0
     unrealized = 0.0
