@@ -121,8 +121,11 @@ def compute_quote(
     if inventory_contracts <= -3:
         ask_size = max(0, order_size - 1)
 
-    # Degenerate / sub-tick spread -> skip quoting the side that would be worse than TOB
-    if ask_c - bid_c < 0.01:
+    # Degenerate / sub-tick spread -> skip. Use int-cents comparison to avoid
+    # floating-point (0.41 - 0.40 can evaluate to 0.00999... in Python).
+    bid_cents = int(round(bid_c * 100))
+    ask_cents = int(round(ask_c * 100))
+    if ask_cents - bid_cents < 1:
         return Quote(bid_c, ask_c, 0, 0, r, (ask_c - bid_c) * 100)
 
     # JOIN vs IMPROVE: if AS bid is below current TOB bid, that means AS wants
