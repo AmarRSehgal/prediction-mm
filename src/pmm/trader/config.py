@@ -66,11 +66,10 @@ class RiskLimits:
     # the only binding constraint is the per-market cap of $5.
     capital_dollars: float = 1000.0
 
-    # Effectively disable total / per-subsector caps for the Sunday test —
-    # we want to see deployed capital grow organically.
-    total_exposure_frac: float = 100.0   # disable
-    per_subsector_frac: float = 100.0    # disable
-    per_market_frac: float = 0.005       # = $5 per market
+    # Honor capital constraint: deployed cannot exceed capital.
+    total_exposure_frac: float = 0.80    # $800 of $1000 max live exposure
+    per_subsector_frac: float = 0.20     # $200 per subsector (prevents one hoarding)
+    per_market_frac: float = 0.005       # $5 per market (per-ticker inventory cap)
 
     # Order sizing (integer contracts)
     default_order_size: int = 2
