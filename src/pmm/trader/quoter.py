@@ -125,12 +125,23 @@ def compute_quote(
     if ask_c - bid_c < 0.01:
         return Quote(bid_c, ask_c, 0, 0, r, (ask_c - bid_c) * 100)
 
-    # If we could not improve on the existing bid (current_bid >= bid), don't post bid
-    if current_bid_dollars is not None and bid_c < current_bid_dollars + 0.005:
-        bid_size = 0
-    # If we could not improve on the existing ask, don't post ask
-    if current_ask_dollars is not None and ask_c > current_ask_dollars - 0.005:
-        ask_size = 0
+    # JOIN vs IMPROVE: if AS bid is below current TOB bid, that means AS wants
+    # a wider spread than the market. Instead of skipping, JOIN the TOB bid —
+    # we still capture the spread if flow crosses us (second in queue behind
+    # existing maker). Same logic on ask.
+    if current_bid_dollars is not None and bid_c < current_bid_dollars:
+        bid_c = round(current_bid_dollars * 100) / 100  # match TOB
+    if current_ask_dollars is not None and ask_c > current_ask_dollars:
+        ask_c = round(current_ask_dollars * 100) / 100
+    # Final safety: we must never cross
+    if current_ask_dollars is not None and bid_c >= current_ask_dollars:
+        bid_c = round((current_ask_dollars - 0.01) * 100) / 100
+        if bid_c <= 0:
+            bid_size = 0
+    if current_bid_dollars is not None and ask_c <= current_bid_dollars:
+        ask_c = round((current_bid_dollars + 0.01) * 100) / 100
+        if ask_c >= 1.0:
+            ask_size = 0
 
     return Quote(
         bid_price_dollars=bid_c,

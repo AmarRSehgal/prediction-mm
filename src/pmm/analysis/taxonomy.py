@@ -56,7 +56,7 @@ SUBSECTOR_RULES: list[tuple[str, str]] = [
     (r"ATPCHALLENGER|CHALLENGERMATCH|WTACHALLENGER", "sports_tennis_challenger"),
     (r"ITFMATCH|ITFWMATCH", "sports_tennis_itf"),
     (r"USOPEN|FRENCHOPEN|WIMBLEDON|AUSOPEN", "sports_tennis_grandslam"),
-    (r"PGA|GOLF|MASTERS|HOLEINONE", "sports_golf"),
+    (r"KXPGA|KXLPGA|KXCHAMPTOUR|KXCHLLDP|KXEUROCUP|KXECULP|KXRYDERCUP|KXMASTERS|KXHOLEINONE|KXGOLF|KXLIVOCCUR|KXLIVG|KXLIVL", "sports_golf"),
     (r"UFC|BOXING|MMA|FLOYDTYSON|WBC|WBA|BANTAMWEIGHT", "sports_combat"),
     (r"NASCAR", "sports_motor_nascar"),
     (r"INDYCAR", "sports_motor_indycar"),
@@ -137,7 +137,7 @@ SUBSECTOR_RULES: list[tuple[str, str]] = [
     (r"EARNINGS|EPS|BEAT", "companies_earnings"),
     (r"ACQUIRE|MERGER|BUYOUT", "companies_ma"),
     (r"IPO|SPINOFF", "companies_ipo"),
-    (r"CEO|LAYOFF|FIRED|RESIGN", "companies_execs"),
+    (r"\bCEO\b|\bLAYOFF\b|\bFIRED\b|\bRESIGN\b", "companies_execs"),
 
     # ---- Entertainment ----
     (r"OSCAR|ACADEMY|ACTOR|ACTRESS|BESTPICT|BESTDIRECT|BESTACT|TONY|EMMY|GRAMMY|CRITICSCHOICE", "ent_awards"),
