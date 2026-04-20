@@ -49,11 +49,18 @@ TUNING: dict[str, SubsectorTuning] = {
     # High toxicity / large moves -> higher gamma (wider/safer)
     "sports_combat":       SubsectorTuning(gamma=35.0, max_markets=15, max_recent_vol_c=5.0),
 
-    # Multi-day tournament sports — reinstate with STRICT vol gate.
-    # During inactive weeks, vol is low; during tournament, vol explodes.
-    # 2.5c threshold will keep us out during the event.
-    "sports_golf":         SubsectorTuning(gamma=25.0, max_markets=20, max_recent_vol_c=2.5),
-    "sports_golf_tgl":     SubsectorTuning(gamma=25.0, max_markets=15, max_recent_vol_c=2.5),
+    # Multi-day tournament sports. Golf tournaments (PGA, LPGA, Champions,
+    # European, Challenge, LIV, etc.) play almost every Thu-Sun of the year.
+    # Blackout those days unconditionally. The events calendar covers
+    # specific non-weekend blackout windows.
+    "sports_golf":         SubsectorTuning(
+        gamma=25.0, max_markets=20, max_recent_vol_c=2.5,
+        blackout_utc_dow=(3, 4, 5, 6),  # Thu, Fri, Sat, Sun
+    ),
+    "sports_golf_tgl":     SubsectorTuning(
+        gamma=25.0, max_markets=15, max_recent_vol_c=2.5,
+        blackout_utc_dow=(3, 4, 5, 6),
+    ),
 
     # Commodities: blackout US equity open + close-hour + EIA time
     "comm_energy":         SubsectorTuning(

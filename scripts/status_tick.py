@@ -1,0 +1,152 @@
+#!/usr/bin/env python3
+"""One-shot status tick.
+
+Reads current portfolio state + trader log, compares against last tick's
+snapshot (stored in trader_state/last_tick.json), prints deltas, updates
+snapshot.
+
+Output fields: fills_delta, flatten_delta, skip_delta, account_value, realized,
+unrealized, open, deployed — plus the deltas since the last tick.
+"""
+from __future__ import annotations
+
+import json
+import re
+import subprocess
+import sys
+import time
+from collections import defaultdict
+from datetime import datetime, timezone
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+from pmm.config import Config
+
+
+def count_log_events(log_path: Path) -> dict[str, int]:
+    counts = {"fills": 0, "flatten": 0, "skip_vol": 0, "errors": 0}
+    if not log_path.exists():
+        return counts
+    with open(log_path, "r", errors="replace") as f:
+        for line in f:
+            if "PAPER FILL" in line:
+                counts["fills"] += 1
+            elif "PAPER FLATTEN" in line:
+                counts["flatten"] += 1
+            elif "SKIP " in line and "recent vol" in line:
+                counts["skip_vol"] += 1
+            elif re.search(r"Traceback|ERROR|Exception", line):
+                counts["errors"] += 1
+    return counts
+
+
+def portfolio_snapshot(state_path: Path) -> dict:
+    if not state_path.exists():
+        return {"account_value": 1000, "realized": 0, "unrealized": 0,
+                "cash_tied": 0, "open": 0, "tracked": 0, "fills": 0,
+                "best_sub": [], "worst_sub": []}
+    data = json.loads(state_path.read_text())
+    positions = data.get("positions") or {}
+    starting = float(data.get("starting_cash", 1000))
+
+    realized = 0.0
+    unrealized = 0.0
+    cash_tied = 0.0
+    n_open = 0
+    n_fills = 0
+    by_sub_net = defaultdict(float)
+    for pos in positions.values():
+        qty = int(pos.get("yes_contracts", 0))
+        cost = float(pos.get("avg_cost_dollars", 0.0))
+        mid = float(pos.get("last_mid_dollars", 0.5))
+        r = float(pos.get("realized_pnl", 0.0))
+        u = qty * (mid - cost)
+        realized += r
+        unrealized += u
+        ct = qty * cost if qty > 0 else -qty * (1 - cost) if qty < 0 else 0
+        cash_tied += ct
+        if qty != 0:
+            n_open += 1
+        n_fills += len(pos.get("fills", []))
+        by_sub_net[pos.get("subsector", "unknown")] += r + u
+
+    sorted_sub = sorted(by_sub_net.items(), key=lambda x: x[1], reverse=True)
+    return {
+        "account_value": starting + realized + unrealized,
+        "realized": realized,
+        "unrealized": unrealized,
+        "cash_tied": cash_tied,
+        "open": n_open,
+        "tracked": len(positions),
+        "fills": n_fills,
+        "best_sub": sorted_sub[:3],
+        "worst_sub": sorted_sub[-3:] if len(sorted_sub) > 3 else [],
+    }
+
+
+def main() -> int:
+    cfg = Config.from_env()
+    state_path = cfg.data_dir / "trader_state" / "portfolio_paper.json"
+    log_path = Path.home() / "personal" / "prediction-mm" / "logs" / "overnight_trader.log"
+    tick_path = cfg.data_dir / "trader_state" / "last_tick.json"
+
+    prev = {}
+    if tick_path.exists():
+        try:
+            prev = json.loads(tick_path.read_text())
+        except Exception:
+            prev = {}
+
+    snap = portfolio_snapshot(state_path)
+    log_counts = count_log_events(log_path)
+    now_iso = datetime.now(tz=timezone.utc).isoformat(timespec="seconds")
+
+    curr = {
+        "ts": now_iso,
+        "account_value": snap["account_value"],
+        "realized": snap["realized"],
+        "unrealized": snap["unrealized"],
+        "cash_tied": snap["cash_tied"],
+        "open": snap["open"],
+        "tracked": snap["tracked"],
+        "fills_total": snap["fills"],
+        "log_fills": log_counts["fills"],
+        "log_flatten": log_counts["flatten"],
+        "log_skip": log_counts["skip_vol"],
+        "log_errors": log_counts["errors"],
+    }
+
+    def delta(k, fmt="{:+d}"):
+        if k not in prev: return "n/a"
+        d = curr[k] - prev[k]
+        if isinstance(d, float): return f"{d:+.4f}"
+        return fmt.format(d)
+
+    print(f"=== tick {now_iso} ===")
+    print(f"  account_value   ${curr['account_value']:.2f}  (delta ${(curr['account_value']-prev.get('account_value',curr['account_value'])):+.4f})")
+    print(f"  realized        ${curr['realized']:+.2f}  (delta ${(curr['realized']-prev.get('realized',curr['realized'])):+.4f})")
+    print(f"  unrealized      ${curr['unrealized']:+.2f}  (delta ${(curr['unrealized']-prev.get('unrealized',curr['unrealized'])):+.4f})")
+    print(f"  cash tied up    ${curr['cash_tied']:.2f}  (delta ${(curr['cash_tied']-prev.get('cash_tied',curr['cash_tied'])):+.2f})")
+    print(f"  open positions  {curr['open']}  (delta {delta('open')})")
+    print(f"  fills (state)   {curr['fills_total']}  (delta {delta('fills_total')})")
+    print(f"  fills (log)     {curr['log_fills']}  (delta {delta('log_fills')})")
+    print(f"  flatten events  {curr['log_flatten']}  (delta {delta('log_flatten')})")
+    print(f"  SKIP-vol events {curr['log_skip']}  (delta {delta('log_skip')})")
+    print(f"  errors          {curr['log_errors']}  (delta {delta('log_errors')})")
+    print()
+    print("  TOP 3 subsectors by net PnL:")
+    for s, net in snap["best_sub"]:
+        print(f"    {s:<30} ${net:+.4f}")
+    if snap["worst_sub"]:
+        print("  BOTTOM 3:")
+        for s, net in snap["worst_sub"]:
+            print(f"    {s:<30} ${net:+.4f}")
+
+    # Persist
+    tick_path.parent.mkdir(parents=True, exist_ok=True)
+    tick_path.write_text(json.dumps(curr, indent=2, default=str))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
