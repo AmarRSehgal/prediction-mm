@@ -273,6 +273,33 @@ class TraderRunner:
                 else:
                     self.executor.reconcile_fills(m.ticker, m.subsector)
 
+                # Queue-depth gate: if our bid/ask is AT the TOB (joining, not
+                # improving), skip that side if TOB queue is large relative to
+                # our size. Prevents dead-queue 1c-spread markets.
+                if isinstance(self.executor, PaperExecutor):
+                    q_bid_size, q_ask_size = self.executor.tob_at_place.get(m.ticker, (0, 0))
+                    max_ratio = sub_tuning.join_queue_max_ratio
+                    # Bid side
+                    if quote.bid_size > 0 and abs(quote.bid_price_dollars - m.yes_bid) < 0.005:
+                        if q_bid_size > max_ratio * max(1, quote.bid_size):
+                            quote = type(quote)(
+                                bid_price_dollars=quote.bid_price_dollars,
+                                ask_price_dollars=quote.ask_price_dollars,
+                                bid_size=0, ask_size=quote.ask_size,
+                                reservation_dollars=quote.reservation_dollars,
+                                spread_cents=quote.spread_cents,
+                            )
+                    # Ask side
+                    if quote.ask_size > 0 and abs(quote.ask_price_dollars - m.yes_ask) < 0.005:
+                        if q_ask_size > max_ratio * max(1, quote.ask_size):
+                            quote = type(quote)(
+                                bid_price_dollars=quote.bid_price_dollars,
+                                ask_price_dollars=quote.ask_price_dollars,
+                                bid_size=quote.bid_size, ask_size=0,
+                                reservation_dollars=quote.reservation_dollars,
+                                spread_cents=quote.spread_cents,
+                            )
+
                 # Now cancel + repost
                 self.executor.cancel_all(m.ticker)
 

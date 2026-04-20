@@ -28,14 +28,19 @@ class SubsectorTuning:
     # tournament-in-progress and settlement-pending windows for multi-day
     # events (golf, tennis grand slams). 0 = disabled.
     skip_if_close_within_hours: float = 0.0
+    # When a side of our quote is AT the TOB (joining, not improving), skip
+    # it if the existing TOB queue > this many contracts per contract we'd
+    # post (so multiplier, not absolute). Default 20 -> at order_size=2 we
+    # skip if TOB > 40 contracts.
+    join_queue_max_ratio: float = 20.0
 
 
 TUNING: dict[str, SubsectorTuning] = {
-    # Low-toxicity, wide spreads, predictable game schedule -> tighter gamma
-    "sports_baseball_kbo": SubsectorTuning(gamma=10.0, max_markets=30, max_recent_vol_c=3.0),
-    "sports_baseball_npb": SubsectorTuning(gamma=10.0, max_markets=30, max_recent_vol_c=3.0),
-    "sports_cricket_psl":  SubsectorTuning(gamma=12.0, max_markets=30, max_recent_vol_c=3.0),
-    "sports_tennis_challenger": SubsectorTuning(gamma=12.0, max_markets=30, max_recent_vol_c=3.0),
+    # Low-toxicity niches — wider queue tolerance (more flow, queue moves fast)
+    "sports_baseball_kbo": SubsectorTuning(gamma=10.0, max_markets=30, max_recent_vol_c=3.0, join_queue_max_ratio=50.0),
+    "sports_baseball_npb": SubsectorTuning(gamma=10.0, max_markets=30, max_recent_vol_c=3.0, join_queue_max_ratio=50.0),
+    "sports_cricket_psl":  SubsectorTuning(gamma=12.0, max_markets=30, max_recent_vol_c=3.0, join_queue_max_ratio=50.0),
+    "sports_tennis_challenger": SubsectorTuning(gamma=12.0, max_markets=30, max_recent_vol_c=3.0, join_queue_max_ratio=50.0),
 
     # Moderate: standard gamma, more markets
     "sports_baseball_us":  SubsectorTuning(gamma=20.0, max_markets=40),
