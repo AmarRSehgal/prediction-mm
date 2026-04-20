@@ -33,6 +33,7 @@ class MarketPosition:
     yes_contracts: int = 0     # net YES contracts. Negative = short YES (= long NO).
     avg_cost_dollars: float = 0.0  # vwap of yes-side cost basis (sign: buying YES adds positive cost)
     realized_pnl: float = 0.0
+    last_mid_dollars: float = 0.5  # last observed mid; used for mark-to-market
     fills: list[Fill] = field(default_factory=list)
 
     def add_fill(self, fill: Fill) -> None:
@@ -79,6 +80,24 @@ class MarketPosition:
             return 0.0
         return self.yes_contracts * (mid - self.avg_cost_dollars)
 
+    def cash_tied_up(self) -> float:
+        """Cash we paid to open this position (still locked)."""
+        if self.yes_contracts == 0:
+            return 0.0
+        if self.yes_contracts > 0:
+            # Long YES: we paid yes_price * qty
+            return self.yes_contracts * self.avg_cost_dollars
+        # Short YES = Long NO: we paid (1 - yes_price) * qty
+        return -self.yes_contracts * (1 - self.avg_cost_dollars)
+
+    def market_value(self, mid: float) -> float:
+        """Current market value if we liquidated at mid."""
+        if self.yes_contracts == 0:
+            return 0.0
+        if self.yes_contracts > 0:
+            return self.yes_contracts * mid
+        return -self.yes_contracts * (1 - mid)
+
 
 @dataclass
 class Portfolio:
@@ -114,6 +133,7 @@ class Portfolio:
                     "yes_contracts": p.yes_contracts,
                     "avg_cost_dollars": p.avg_cost_dollars,
                     "realized_pnl": p.realized_pnl,
+                    "last_mid_dollars": p.last_mid_dollars,
                     "fills": [asdict(f) for f in p.fills],
                 }
                 for t, p in self.positions.items()
@@ -128,6 +148,7 @@ class Portfolio:
                 ticker=d["ticker"], subsector=d["subsector"],
                 yes_contracts=d["yes_contracts"], avg_cost_dollars=d["avg_cost_dollars"],
                 realized_pnl=d["realized_pnl"],
+                last_mid_dollars=d.get("last_mid_dollars", 0.5),
                 fills=[Fill(**f) for f in d.get("fills", [])],
             )
             p.positions[t] = mp

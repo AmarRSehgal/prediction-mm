@@ -159,6 +159,8 @@ class TraderRunner:
                     min_age_hours=self.tcfg.schedule.min_age_hours,
                 )
                 pos = self.portfolio.position(m.ticker, m.subsector)
+                # Persist current mid for mark-to-market in the PnL tracker
+                pos.last_mid_dollars = m.mid
 
                 # Exit / closed: cancel and flatten
                 if win.state in ("EXIT", "CLOSED"):
