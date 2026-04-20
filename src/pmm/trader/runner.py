@@ -181,6 +181,14 @@ class TraderRunner:
                     self.executor.cancel_all(m.ticker)
                     continue
 
+                # Close-time proximity blackout (tournament-in-progress / settlement-pending)
+                sub_tune = get_tuning(m.subsector)
+                if sub_tune.skip_if_close_within_hours > 0 and m.close_time is not None:
+                    hrs_to_close = (m.close_time - now).total_seconds() / 3600
+                    if hrs_to_close < sub_tune.skip_if_close_within_hours:
+                        self.executor.cancel_all(m.ticker)
+                        continue
+
                 # Dynamic price-discovery gate: pull recent trades, measure
                 # mean abs consecutive-trade move in the last 1 hour. If it
                 # exceeds the per-subsector threshold, skip quoting — the

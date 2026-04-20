@@ -24,6 +24,10 @@ class SubsectorTuning:
     # exceeds this (in cents). Detects price-discovery / info-release
     # regardless of schedule. Lower for quieter subsectors.
     max_recent_vol_c: float = 4.0  # default: skip if > 4c mean abs move / trade
+    # Skip markets whose close_time is within this many hours. Catches
+    # tournament-in-progress and settlement-pending windows for multi-day
+    # events (golf, tennis grand slams). 0 = disabled.
+    skip_if_close_within_hours: float = 0.0
 
 
 TUNING: dict[str, SubsectorTuning] = {
@@ -49,17 +53,19 @@ TUNING: dict[str, SubsectorTuning] = {
     # High toxicity / large moves -> higher gamma (wider/safer)
     "sports_combat":       SubsectorTuning(gamma=35.0, max_markets=15, max_recent_vol_c=5.0),
 
-    # Multi-day tournament sports. Golf tournaments (PGA, LPGA, Champions,
-    # European, Challenge, LIV, etc.) play almost every Thu-Sun of the year.
-    # Blackout those days unconditionally. The events calendar covers
-    # specific non-weekend blackout windows.
+    # Multi-day tournament sports. Golf tournaments (PGA, LPGA, European,
+    # Challenge, LIV, etc.) happen most weekends. Weekday blackout was too
+    # coarse. Instead: skip if close_time is within 48h (catches
+    # tournament-in-progress AND just-finished-pending-settlement windows).
+    # Mon-Wed of tournament week typically have all markets closing 96h+ out,
+    # so are unblocked.
     "sports_golf":         SubsectorTuning(
         gamma=25.0, max_markets=20, max_recent_vol_c=2.5,
-        blackout_utc_dow=(3, 4, 5, 6),  # Thu, Fri, Sat, Sun
+        skip_if_close_within_hours=48.0,
     ),
     "sports_golf_tgl":     SubsectorTuning(
         gamma=25.0, max_markets=15, max_recent_vol_c=2.5,
-        blackout_utc_dow=(3, 4, 5, 6),
+        skip_if_close_within_hours=48.0,
     ),
 
     # Commodities: blackout US equity open + close-hour + EIA time
