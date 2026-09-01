@@ -83,6 +83,7 @@ def compute_quote(
     """Two-sided passive quote. Either side may be suppressed independently
     (size 0) when the AS price for that side is worse than the top of book."""
     min_spread_cents = max(1, int(min_spread_cents))
+    order_size = max(0, int(order_size))
 
     tte_frac_spread = max(0.0, min(tte_hours_to_exit / 24.0, 1.0))
     tte_frac_skew = max(0.0, min(tte_hours_to_exit / 24.0, 2.0))

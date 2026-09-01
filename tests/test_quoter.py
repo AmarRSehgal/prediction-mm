@@ -173,3 +173,9 @@ def test_k_order_arrival_is_load_bearing():
     wide = q(0.20, 0.80, params=replace(P, k_order_arrival=40.0)).spread_cents
     tight = q(0.20, 0.80, params=replace(P, k_order_arrival=4000.0)).spread_cents
     assert wide > tight
+
+
+def test_a_zero_or_negative_order_size_yields_no_quote():
+    for size in (0, -3):
+        r = q(0.30, 0.50, size=size)
+        assert r.bid_size == 0 and r.ask_size == 0
