@@ -1,6 +1,7 @@
 """Game-window scheduling. The golf post-mortem and every subsequent sports
 loss traces back to quoting inside a live event, so the parsers matter.
 """
+import pytest
 from datetime import datetime, timedelta, timezone
 
 from pmm.trader.schedule import compute_window, parse_game_start_utc
@@ -71,3 +72,20 @@ def test_GAP_no_nfl_or_nba_game_time_parser():
     w2 = compute_window("KXNFLGAME-26SEP14SEAARI", "sports_nfl",
                         close_time=kickoff + timedelta(hours=4), now=now - timedelta(days=7))
     assert w2.state == "SAFE"
+
+
+@pytest.mark.xfail(reason="events_calendar not refreshed since 2026-05-24", strict=False)
+def test_events_calendar_has_forward_coverage():
+    """A calendar with no future events makes every calendar blackout check
+    return False -- one of the three protective layers silently disappears.
+
+    xfail rather than fail so the suite stays green and informative; it turns
+    into an XPASS the moment someone refreshes EVENTS, which is the signal we
+    want. TraderRunner also logs an ERROR at startup when coverage is gone.
+    """
+    from pmm.trader.events_calendar import calendar_coverage_days
+    coverage = calendar_coverage_days(datetime.now(tz=UTC))
+    assert coverage > 0, (
+        f"events_calendar is {-coverage:.0f} days stale; calendar blackouts are "
+        "a no-op. Refresh EVENTS in src/pmm/trader/events_calendar.py."
+    )

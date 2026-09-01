@@ -161,6 +161,17 @@ EVENTS: list[Event] = [
 ]
 
 
+def latest_event_end() -> datetime:
+    """End of the last event on the calendar. Used to detect a stale calendar."""
+    return max(e.end_utc for e in EVENTS)
+
+
+def calendar_coverage_days(now: datetime) -> float:
+    """Days of forward coverage left. <= 0 means the calendar is exhausted and
+    is_subsector_blacked_out_by_calendar can only ever return False."""
+    return (latest_event_end() - now).total_seconds() / 86400
+
+
 def active_events_for(now: datetime, subsector: str) -> list[Event]:
     """Return all events currently active for this subsector (including buffers)."""
     out = []

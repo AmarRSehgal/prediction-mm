@@ -23,7 +23,7 @@ from pmm.trader.position import load_portfolio, save_portfolio
 from pmm.trader.quoter import compute_quote
 from pmm.trader.risk import assess_market
 from pmm.trader.schedule import compute_window
-from pmm.trader.events_calendar import is_subsector_blacked_out_by_calendar
+from pmm.trader.events_calendar import calendar_coverage_days, is_subsector_blacked_out_by_calendar
 from pmm.trader.subsector_tuning import get as get_tuning, is_in_blackout
 from pmm.trader.universe import discover_markets
 
@@ -120,6 +120,16 @@ class TraderRunner:
         cycle = 0
         log.info("starting trader: dry_run=%s capital=$%.2f targets=%s",
                  self.tcfg.dry_run, self.tcfg.risk.capital_dollars, self.tcfg.target_subsectors)
+
+        # A stale events_calendar is silently a no-op: every calendar blackout
+        # check returns False and one of the three protective layers is simply
+        # gone with no error anywhere. Say so loudly at startup.
+        coverage = calendar_coverage_days(datetime.now(tz=timezone.utc))
+        if coverage <= 0:
+            log.error("events_calendar is EXHAUSTED (%.0f days past its last event). "
+                      "Calendar blackouts are disabled. Refresh events_calendar.py.", -coverage)
+        elif coverage < 7:
+            log.warning("events_calendar has only %.1f days of forward coverage left.", coverage)
 
         while not self._stop:
             cycle_start = time.monotonic()
