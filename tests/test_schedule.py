@@ -74,14 +74,13 @@ def test_GAP_no_nfl_or_nba_game_time_parser():
     assert w2.state == "SAFE"
 
 
-@pytest.mark.xfail(reason="events_calendar not refreshed since 2026-05-24", strict=False)
 def test_events_calendar_has_forward_coverage():
     """A calendar with no future events makes every calendar blackout check
     return False -- one of the three protective layers silently disappears.
 
-    xfail rather than fail so the suite stays green and informative; it turns
-    into an XPASS the moment someone refreshes EVENTS, which is the signal we
-    want. TraderRunner also logs an ERROR at startup when coverage is gone.
+    This was an xfail while EVENTS was 99 days stale. It is a hard assertion
+    now, so letting the calendar expire again breaks the suite instead of
+    quietly turning the layer off. TraderRunner also logs an ERROR at startup.
     """
     from pmm.trader.events_calendar import calendar_coverage_days
     coverage = calendar_coverage_days(datetime.now(tz=UTC))

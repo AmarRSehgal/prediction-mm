@@ -1,23 +1,35 @@
 """Known-event blackout calendar.
 
-During these windows, we DO NOT quote markets in the listed subsectors.
-Buffers: default 6h before start, 2h after end (overridable per event).
+During these windows we do NOT quote markets in the listed subsectors.
 
-Sources of dates (added 2026-04-19):
-- PGA Tour 2026 schedule (ESPN, PGA Tour, Wikipedia)
-- UFC 2026 schedule (CBS Sports, UFC.com, Yahoo Sports)
-- BLS / WH / Fed releases (standard monthly cadence + FOMC calendar)
-- Tesla Q1 2026 earnings (Tesla IR, IG)
+Keep this file dumb -- schedules and the two predicates over them, nothing
+else. The runner calls `is_subsector_blacked_out_by_calendar`, and shouts at
+startup when `calendar_coverage_days` has run out (a stale calendar is
+otherwise a silent no-op: every check just returns False and one of the three
+protective layers is simply gone).
 
-Keep this file dumb — just data. Runner checks `is_market_in_event_window`.
+The per-market realized-vol gate in runner.py is a separate, dynamic layer
+that catches what the calendar misses. The calendar's job is the opposite one:
+stand down BEFORE a scheduled shock, while the book still looks calm.
 
-NOTE: the per-market realized-vol gate (see runner.py) is a separate,
-dynamic layer that catches things the calendar misses.
+Sources, refreshed 2026-09-01 (the previous contents expired 2026-05-24):
+  Employment Situation  bls.gov/schedule/news_release/empsit.htm
+  CPI                   bls.gov/schedule/news_release/cpi.htm
+  PPI                   bls.gov/schedule/news_release/ppi.htm
+  GDP                   bea.gov/news/schedule
+  FOMC                  federalreserve.gov/monetarypolicy/fomccalendars.htm
+
+All four statistical releases are 08:30 America/New_York; the FOMC statement
+is 14:00 with the press conference at 14:30. Times are declared in ET and
+converted here, so the November DST change is handled rather than hardcoded.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
+
+ET = ZoneInfo("America/New_York")
 
 
 @dataclass(frozen=True)
@@ -30,135 +42,67 @@ class Event:
     buffer_after_hours: float = 2.0
 
 
-def _dt(y: int, m: int, d: int, h: int = 0, mi: int = 0) -> datetime:
-    return datetime(y, m, d, h, mi, tzinfo=timezone.utc)
+def _et(y: int, m: int, d: int, h: int = 0, mi: int = 0) -> datetime:
+    """An America/New_York wall-clock time, as UTC."""
+    return datetime(y, m, d, h, mi, tzinfo=ET).astimezone(timezone.utc)
 
 
-# ---- PGA Tour 2026 (Apr 20 - May 10) --------------------------------------
-# Rounds play Thu-Sun typical, ~12:00-22:00 UTC per day.
-# Market reacts each day during play. Blackout during play hours on tournament days.
-# Simplification: block Thu 12:00 UTC -> Sun 23:00 UTC.
+# ---- US statistical releases (08:30 ET) ---------------------------------
+# (month, day) in 2026. Release shock plus follow-through; the 1h lead buffer
+# covers pre-release positioning.
 
-EVENTS: list[Event] = [
-    Event(
-        name="PGA RBC Heritage (past, kept as doc)",
-        subsectors=("sports_golf",),
-        start_utc=_dt(2026, 4, 16, 12, 0),  # Thu
-        end_utc=_dt(2026, 4, 19, 23, 0),    # Sun
-    ),
-    Event(
-        name="PGA Zurich Classic of New Orleans",
-        subsectors=("sports_golf",),
-        start_utc=_dt(2026, 4, 23, 12, 0),
-        end_utc=_dt(2026, 4, 26, 23, 0),
-    ),
-    Event(
-        name="PGA Miami Championship / CJ Cup Byron Nelson week",
-        subsectors=("sports_golf",),
-        start_utc=_dt(2026, 4, 30, 12, 0),
-        end_utc=_dt(2026, 5, 3, 23, 0),
-    ),
-    Event(
-        name="PGA Truist Championship + Myrtle Beach Classic",
-        subsectors=("sports_golf",),
-        start_utc=_dt(2026, 5, 7, 12, 0),
-        end_utc=_dt(2026, 5, 10, 23, 0),
-    ),
+_RELEASES: tuple[tuple[str, tuple[str, ...], tuple[tuple[int, int], ...]], ...] = (
+    ("US Employment Situation", ("eco_jobs", "eco_fed"),
+     ((9, 4), (10, 2), (11, 6), (12, 4))),
+    ("US CPI", ("eco_cpi", "eco_fed"),
+     ((9, 11), (10, 14), (11, 10), (12, 10))),
+    ("US PPI", ("eco_ppi", "eco_fed"),
+     ((9, 10), (10, 15), (11, 13), (12, 15))),
+    ("US GDP", ("eco_gdp", "eco_fed"),
+     ((9, 30), (10, 29), (11, 25), (12, 23))),
+)
 
-    # ---- UFC numbered events (PPVs) + Fight Nights with known dates -------
-    Event(
-        name="UFC Fight Night Perth AU",
-        subsectors=("sports_combat",),
-        start_utc=_dt(2026, 5, 2, 8, 0),    # Sat morning UTC (Perth evening)
-        end_utc=_dt(2026, 5, 2, 14, 0),
-    ),
-    Event(
-        name="UFC 328 Prochazka vs Ulberg",
-        subsectors=("sports_combat",),
-        start_utc=_dt(2026, 5, 9, 22, 0),   # Sat evening US
-        end_utc=_dt(2026, 5, 10, 6, 0),     # Sun morning UTC
-    ),
-    Event(
-        name="Mike Tyson vs Floyd Mayweather boxing",
-        subsectors=("sports_combat",),
-        start_utc=_dt(2026, 4, 25, 22, 0),  # Sat evening US
-        end_utc=_dt(2026, 4, 26, 6, 0),
-    ),
+# FOMC: (month, day of the DECISION -- the second day of each meeting).
+# Sep 15-16, Oct 27-28, Dec 8-9; Sep and Dec also carry an SEP.
+_FOMC_DECISIONS: tuple[tuple[int, int], ...] = ((9, 16), (10, 28), (12, 9))
 
-    # ---- PSL playoffs + final --------------------------------------------
-    Event(
-        name="PSL 2026 Qualifier 1",
-        subsectors=("sports_cricket_psl",),
-        start_utc=_dt(2026, 4, 28, 13, 0),  # Pakistan evening
-        end_utc=_dt(2026, 4, 28, 19, 0),
-    ),
-    Event(
-        name="PSL 2026 Eliminators 1 and 2",
-        subsectors=("sports_cricket_psl",),
-        start_utc=_dt(2026, 4, 29, 9, 0),
-        end_utc=_dt(2026, 4, 29, 20, 0),
-    ),
-    Event(
-        name="PSL 2026 Final",
-        subsectors=("sports_cricket_psl",),
-        start_utc=_dt(2026, 5, 3, 13, 0),
-        end_utc=_dt(2026, 5, 3, 19, 0),
-    ),
+# Subsectors whose pricing moves off the macro tape even though they are not
+# themselves economic markets. Kept narrow on purpose -- a blackout that
+# covers everything is the same as no blackout. Empty while the commodity
+# subsectors are out of TARGET_SUBSECTORS; re-add ("comm_gold",
+# "comm_precious_other") alongside the commodity-ladder work, since gold and
+# silver are the ones that actually trade the macro tape.
+_MACRO_SPILLOVER: tuple[str, ...] = ()
 
-    # ---- Earnings ---------------------------------------------------------
-    Event(
-        name="Tesla Q1 2026 earnings",
-        subsectors=("tech_ev_tesla", "companies_earnings"),
-        start_utc=_dt(2026, 4, 22, 20, 0),  # blackout from 4pm ET the day of
-        end_utc=_dt(2026, 4, 23, 14, 0),    # through next-day US open
-        buffer_before_hours=4.0,
-    ),
 
-    # ---- Economic releases (US) -------------------------------------------
-    # NFP first Friday of each month, 13:30 UTC
-    Event(
-        name="US NFP / Jobs Report - May release",
-        subsectors=("eco_jobs", "eco_fed"),
-        start_utc=_dt(2026, 5, 1, 13, 0),
-        end_utc=_dt(2026, 5, 1, 16, 0),
-    ),
-    # CPI typically 2nd week of month, Wednesday 13:30 UTC (8:30 ET)
-    Event(
-        name="US CPI - May release",
-        subsectors=("eco_cpi", "eco_fed", "comm_gold"),
-        start_utc=_dt(2026, 5, 13, 13, 0),
-        end_utc=_dt(2026, 5, 13, 16, 0),
-    ),
-    Event(
-        name="US PPI - May release",
-        subsectors=("eco_ppi", "eco_fed"),
-        start_utc=_dt(2026, 5, 14, 13, 0),  # day after CPI typically
-        end_utc=_dt(2026, 5, 14, 16, 0),
-    ),
-    Event(
-        name="US GDP Advance Q1 - Apr 30 release",
-        subsectors=("eco_gdp", "eco_fed", "comm_gold"),
-        start_utc=_dt(2026, 4, 30, 13, 0),
-        end_utc=_dt(2026, 4, 30, 16, 0),
-    ),
-    # FOMC April meeting (Apr 28-29), May meeting typically mid-June
-    Event(
-        name="FOMC April meeting + presser",
-        subsectors=("eco_fed", "eco_cpi", "comm_gold", "tech_ev_tesla"),
-        start_utc=_dt(2026, 4, 28, 14, 0),
-        end_utc=_dt(2026, 4, 29, 21, 0),
-        buffer_before_hours=2.0,
-    ),
+def _build_events() -> list[Event]:
+    out: list[Event] = []
+    for name, subsectors, days in _RELEASES:
+        for month, day in days:
+            start = _et(2026, month, day, 8, 30)
+            out.append(Event(
+                name=f"{name} {month:02d}-{day:02d}",
+                subsectors=subsectors + _MACRO_SPILLOVER,
+                start_utc=start,
+                end_utc=start + timedelta(hours=3),
+                buffer_before_hours=1.0,
+                buffer_after_hours=1.0,
+            ))
+    for month, day in _FOMC_DECISIONS:
+        start = _et(2026, month, day, 14, 0)
+        out.append(Event(
+            name=f"FOMC decision + presser {month:02d}-{day:02d}",
+            subsectors=("eco_fed", "eco_cpi", "eco_gdp", "eco_jobs") + _MACRO_SPILLOVER,
+            start_utc=start,
+            end_utc=start + timedelta(hours=2),
+            buffer_before_hours=3.0,
+            buffer_after_hours=2.0,
+        ))
+    out.sort(key=lambda e: e.start_utc)
+    return out
 
-    # ---- Tennis majors (French Open) --------------------------------------
-    # Roland-Garros: May 24 - June 7, 2026. Outside our window but add early.
-    Event(
-        name="Roland-Garros qualifying week",
-        subsectors=("sports_tennis_challenger",),
-        start_utc=_dt(2026, 5, 18, 8, 0),
-        end_utc=_dt(2026, 5, 24, 22, 0),
-    ),
-]
+
+EVENTS: list[Event] = _build_events()
 
 
 def latest_event_end() -> datetime:
@@ -172,8 +116,14 @@ def calendar_coverage_days(now: datetime) -> float:
     return (latest_event_end() - now).total_seconds() / 86400
 
 
+def covered_subsectors() -> set[str]:
+    """Every subsector any event mentions. A subsector NOT in here gets no
+    calendar protection at all, which is worth knowing before trading it."""
+    return {s for e in EVENTS for s in e.subsectors}
+
+
 def active_events_for(now: datetime, subsector: str) -> list[Event]:
-    """Return all events currently active for this subsector (including buffers)."""
+    """Return all events currently active for this subsector (incl. buffers)."""
     out = []
     for e in EVENTS:
         if subsector not in e.subsectors:

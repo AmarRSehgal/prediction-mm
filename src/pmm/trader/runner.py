@@ -24,7 +24,11 @@ from pmm.trader.position import load_portfolio, save_portfolio
 from pmm.trader.quoter import compute_quote
 from pmm.trader.risk import assess_market
 from pmm.trader.schedule import compute_window
-from pmm.trader.events_calendar import calendar_coverage_days, is_subsector_blacked_out_by_calendar
+from pmm.trader.events_calendar import (
+    calendar_coverage_days,
+    covered_subsectors,
+    is_subsector_blacked_out_by_calendar,
+)
 from pmm.trader.subsector_tuning import get as get_tuning, is_in_blackout
 from pmm.trader.universe import discover_markets
 
@@ -140,6 +144,12 @@ class TraderRunner:
                       "Calendar blackouts are disabled. Refresh events_calendar.py.", -coverage)
         elif coverage < 7:
             log.warning("events_calendar has only %.1f days of forward coverage left.", coverage)
+        uncovered = sorted(set(self.tcfg.target_subsectors) - covered_subsectors())
+        if uncovered:
+            log.warning("no calendar events at all for %d/%d target subsectors: %s. "
+                        "These rely entirely on the realized-vol gate and the "
+                        "per-subsector UTC-hour blackouts.",
+                        len(uncovered), len(self.tcfg.target_subsectors), ", ".join(uncovered))
 
         while not self._stop:
             cycle_start = time.monotonic()
