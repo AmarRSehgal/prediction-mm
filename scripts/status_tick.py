@@ -54,6 +54,7 @@ def portfolio_snapshot(state_path: Path) -> dict:
     cash_tied = 0.0
     n_open = 0
     n_fills = 0
+    fees = 0.0
     by_sub_net = defaultdict(float)
     # Spread-bucket split: positions whose first fill came at TOB spread < 3c
     # vs >= 3c. Lets us evaluate the 1c-min-spread change in isolation.
@@ -65,6 +66,7 @@ def portfolio_snapshot(state_path: Path) -> dict:
         cost = float(pos.get("avg_cost_dollars", 0.0))
         mid = float(pos.get("last_mid_dollars", 0.5))
         r = float(pos.get("realized_pnl", 0.0))
+        fees += float(pos.get("fees_paid", 0.0))
         u = qty * (mid - cost)
         realized += r
         unrealized += u
@@ -94,6 +96,7 @@ def portfolio_snapshot(state_path: Path) -> dict:
         "account_value": starting + realized + unrealized,
         "realized": realized,
         "unrealized": unrealized,
+        "fees": fees,
         "cash_tied": cash_tied,
         "open": n_open,
         "tracked": len(positions),
@@ -127,6 +130,7 @@ def main() -> int:
         "account_value": snap["account_value"],
         "realized": snap["realized"],
         "unrealized": snap["unrealized"],
+        "fees": snap["fees"],
         "cash_tied": snap["cash_tied"],
         "open": snap["open"],
         "tracked": snap["tracked"],
@@ -147,6 +151,7 @@ def main() -> int:
     print(f"  account_value   ${curr['account_value']:.2f}  (delta ${(curr['account_value']-prev.get('account_value',curr['account_value'])):+.4f})")
     print(f"  realized        ${curr['realized']:+.2f}  (delta ${(curr['realized']-prev.get('realized',curr['realized'])):+.4f})")
     print(f"  unrealized      ${curr['unrealized']:+.2f}  (delta ${(curr['unrealized']-prev.get('unrealized',curr['unrealized'])):+.4f})")
+    print(f"  fees paid       ${curr['fees']:.4f}  (delta ${(curr['fees']-prev.get('fees',curr['fees'])):+.4f})  [realized is NET of these]")
     print(f"  cash tied up    ${curr['cash_tied']:.2f}  (delta ${(curr['cash_tied']-prev.get('cash_tied',curr['cash_tied'])):+.2f})")
     print(f"  open positions  {curr['open']}  (delta {delta('open')})")
     print(f"  fills (state)   {curr['fills_total']}  (delta {delta('fills_total')})")
