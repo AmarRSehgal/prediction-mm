@@ -101,6 +101,13 @@ class ASParams:
     sigma_floor_c: float = 2.0
     sigma_window_minutes: int = 30
     inventory_skew_coef: float = 0.02
+    # Avellaneda-Stoikov order-arrival decay `k`, in 1/dollars. It sets the
+    # floor of the desired spread via (2/gamma) * ln(1 + gamma/k): at the
+    # default it alone is 4.05c, which dominates the volatility term
+    # (1.2-2.5c at sigma=5c). It was a bare `40` inline in quoter.py and has
+    # never been calibrated against realised fill rates -- until it is, the
+    # posted spread is essentially set by this constant. Raising k narrows.
+    k_order_arrival: float = 40.0
 
 
 # ---- Schedule / TTE rules ----------------------------------------------
