@@ -9,7 +9,7 @@ Defaults kick in for any subsector not listed.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
@@ -37,6 +37,10 @@ class SubsectorTuning:
     # whether we can take the real TOB to exit at entry_cost + min_profit_c.
     # If adverse mid drift >= adverse_cutoff_c against us, close anyway to
     # cap the loss rather than bleed passively (see design 2026-04-21).
+    # DISABLED 2026-08-31 for the same reason as rule C: 35 aggressive closes
+    # in the 2026-04-22..23 session lost -$7.49 (mean -21.4c each). The
+    # adverse-drift override in particular just crosses the spread to lock in
+    # a loss that the passive quote was already positioned to work out of.
     close_aggressive_enabled: bool = False
     min_profit_c: int = 1          # require this much profit to close
     adverse_cutoff_c: int = 3      # override: force close if mid drift worse
@@ -53,7 +57,12 @@ class SubsectorTuning:
     # "dead zone"). 0-30min cohort had 75-83% winrate and positive PnL. So
     # force-close any position held >= max_hold_minutes by taking real TOB.
     # Existing position gets closed once; no new quotes until it lands.
-    rule_c_enabled: bool = True
+    # DISABLED 2026-08-31 after auditing the 2026-04-22..23 session: rule C
+    # was responsible for -$25.21 of that session's -$31.47 across 404 forced
+    # closes (mean -6.2c each). Force-closing at TOB pays the full spread on
+    # every exit, which is the opposite of the business. Keep the code, keep
+    # it off, and re-enable only behind a measured A/B.
+    rule_c_enabled: bool = False
     max_hold_minutes: float = 30.0
     # Pre-game blackout (idea 1): hours before game_start to go to EXIT state.
     # Default 2h; raise for subsectors where informed flow arrives earlier.
@@ -78,13 +87,13 @@ class SubsectorTuning:
 TUNING: dict[str, SubsectorTuning] = {
     # Low-toxicity niches — wider queue tolerance (more flow, queue moves fast)
     "sports_baseball_kbo": SubsectorTuning(gamma=10.0, max_markets=30, max_recent_vol_c=3.0, join_queue_max_ratio=50.0,
-                                             close_aggressive_enabled=True, adverse_cutoff_c=4),
+                                             close_aggressive_enabled=False, adverse_cutoff_c=4),
     "sports_baseball_npb": SubsectorTuning(gamma=10.0, max_markets=30, max_recent_vol_c=3.0, join_queue_max_ratio=50.0,
-                                             close_aggressive_enabled=True, adverse_cutoff_c=4),
+                                             close_aggressive_enabled=False, adverse_cutoff_c=4),
     # sports_cricket_psl: bleed -$1.58 Monday session. Wider adverse_cutoff to
     # allow for game-event variance, but aggressive close on profit.
     "sports_cricket_psl":  SubsectorTuning(gamma=12.0, max_markets=30, max_recent_vol_c=3.0, join_queue_max_ratio=50.0,
-                                             close_aggressive_enabled=True, adverse_cutoff_c=5),
+                                             close_aggressive_enabled=False, adverse_cutoff_c=5),
     "sports_tennis_challenger": SubsectorTuning(gamma=12.0, max_markets=30, max_recent_vol_c=3.0, join_queue_max_ratio=50.0),
 
     # Moderate: standard gamma, more markets. Sports have stable mids between
@@ -93,22 +102,20 @@ TUNING: dict[str, SubsectorTuning] = {
     # markets (now blacklisted by ticker) + live-game flow. Bumping to 8h
     # pre-game blackout for remaining positions.
     "sports_baseball_us":  SubsectorTuning(gamma=20.0, max_markets=40,
-                                            close_aggressive_enabled=True, adverse_cutoff_c=4,
+                                            close_aggressive_enabled=False, adverse_cutoff_c=4,
                                             pre_game_blackout_hours=8.0),
     "sports_cricket_ipl":  SubsectorTuning(gamma=20.0, max_markets=20,
-                                            close_aggressive_enabled=True, adverse_cutoff_c=4),
+                                            close_aggressive_enabled=False, adverse_cutoff_c=4),
     "sports_cricket_odi":  SubsectorTuning(gamma=15.0, max_markets=20,
-                                            close_aggressive_enabled=True, adverse_cutoff_c=4),
+                                            close_aggressive_enabled=False, adverse_cutoff_c=4),
     "sports_cricket_t20_misc": SubsectorTuning(gamma=18.0, max_markets=20,
-                                                close_aggressive_enabled=True, adverse_cutoff_c=4),
+                                                close_aggressive_enabled=False, adverse_cutoff_c=4),
     "sports_soccer_mls":   SubsectorTuning(gamma=20.0, max_markets=30,
-                                            close_aggressive_enabled=True, adverse_cutoff_c=4),
+                                            close_aggressive_enabled=False, adverse_cutoff_c=4),
     "sports_basketball_cba": SubsectorTuning(gamma=18.0, max_markets=20,
-                                              close_aggressive_enabled=True, adverse_cutoff_c=4),
+                                              close_aggressive_enabled=False, adverse_cutoff_c=4),
     "sports_basketball_acb": SubsectorTuning(gamma=18.0, max_markets=20,
-                                              close_aggressive_enabled=True, adverse_cutoff_c=4),
-    "sports_golf":         SubsectorTuning(gamma=18.0, max_markets=30,
-                                            close_aggressive_enabled=True, adverse_cutoff_c=4),
+                                              close_aggressive_enabled=False, adverse_cutoff_c=4),
     # Esports: same-day live-match risk is high even with game-time parser —
     # only trade markets closing >6h out so we're not caught in-progress.
     # Aggressive close with wider adverse_cutoff (5c) — game events produce
@@ -116,19 +123,19 @@ TUNING: dict[str, SubsectorTuning] = {
     "sports_esports_valorant": SubsectorTuning(
         gamma=22.0, max_markets=20, max_recent_vol_c=3.0,
         skip_if_close_within_hours=6.0,
-        close_aggressive_enabled=True, adverse_cutoff_c=5,
+        close_aggressive_enabled=False, adverse_cutoff_c=5,
         pre_game_blackout_hours=12.0,
     ),
     "sports_esports_cs2":  SubsectorTuning(
         gamma=22.0, max_markets=20, max_recent_vol_c=3.0,
         skip_if_close_within_hours=6.0,
-        close_aggressive_enabled=True, adverse_cutoff_c=5,
+        close_aggressive_enabled=False, adverse_cutoff_c=5,
         pre_game_blackout_hours=12.0,
     ),
     "sports_esports_dota": SubsectorTuning(
         gamma=22.0, max_markets=20, max_recent_vol_c=3.0,
         skip_if_close_within_hours=6.0,
-        close_aggressive_enabled=True, adverse_cutoff_c=5,
+        close_aggressive_enabled=False, adverse_cutoff_c=5,
         pre_game_blackout_hours=12.0,
     ),
 
@@ -210,12 +217,12 @@ TUNING: dict[str, SubsectorTuning] = {
     "ent_music":           SubsectorTuning(
         gamma=22.0, max_markets=25, max_recent_vol_c=2.5,
         blackout_utc_dow=(1,),  # 0=Mon, 1=Tue
-        close_aggressive_enabled=True, adverse_cutoff_c=3,
+        close_aggressive_enabled=False, adverse_cutoff_c=3,
     ),
     "ent_awards":          SubsectorTuning(gamma=18.0, max_markets=30,
-                                             close_aggressive_enabled=True, adverse_cutoff_c=3),
+                                             close_aggressive_enabled=False, adverse_cutoff_c=3),
     "ent_tv_reality":      SubsectorTuning(gamma=18.0, max_markets=15,
-                                             close_aggressive_enabled=True, adverse_cutoff_c=3),
+                                             close_aggressive_enabled=False, adverse_cutoff_c=3),
 
     # Politics (low-hour-sensitivity)
     "pol_fiscal":          SubsectorTuning(gamma=18.0, max_markets=20),

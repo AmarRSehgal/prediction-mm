@@ -5,7 +5,6 @@ import logging
 import signal
 import time
 from dataclasses import dataclass
-from typing import Iterable
 
 from pmm.kalshi.client import KalshiAPIError, KalshiClient
 from pmm.storage.parquet import OrderbookWriter

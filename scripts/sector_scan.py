@@ -67,7 +67,7 @@ def main() -> int:
             log.info("  progress %d / %d (elapsed %.0fs, %d skipped)", i, len(series_df), time.time() - t0, skipped)
         try:
             r = client.list_markets(series_ticker=s, status="open", limit=200)
-        except KalshiAPIError as e:
+        except KalshiAPIError:
             skipped += 1
             continue
         except Exception:

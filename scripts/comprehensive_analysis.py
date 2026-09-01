@@ -16,7 +16,6 @@ This is a long-running job (~10-20 min depending on market count).
 """
 from __future__ import annotations
 
-import json
 import logging
 import sys
 import time

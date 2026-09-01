@@ -11,17 +11,15 @@ from __future__ import annotations
 import logging
 import signal
 import time
-from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 
 import pandas as pd
 
-from pmm.config import Config
 from pmm.kalshi.client import KalshiClient
 from pmm.trader.config import TraderConfig
 from pmm.trader.executor import LiveExecutor, OrderIntent, PaperExecutor
-from pmm.trader.position import Portfolio, load_portfolio, save_portfolio
+from pmm.trader.position import load_portfolio, save_portfolio
 from pmm.trader.quoter import compute_quote
 from pmm.trader.risk import assess_market
 from pmm.trader.schedule import compute_window
@@ -61,9 +59,6 @@ class TraderRunner:
         from collections import deque
         self._mid_history: dict[str, deque] = {}
         self._MID_HISTORY_MAX = 30
-        # Cache for per-subsector tuning to avoid recomputation
-        from pmm.trader.subsector_tuning import TUNING
-        sub_tuning_cache = {}  # kept local; populated in run()
         # Universe cache: discover_markets is expensive (O(N series) API calls).
         # Cache the result and only refresh every ~300s.
         self._universe_cache: list = []

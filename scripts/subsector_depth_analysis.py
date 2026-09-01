@@ -27,7 +27,7 @@ import pandas as pd
 
 from pmm.analysis.depth_metrics import depth_metrics, trade_metrics
 from pmm.config import Config
-from pmm.kalshi.client import KalshiAPIError, KalshiClient
+from pmm.kalshi.client import KalshiClient
 
 
 def main() -> int:

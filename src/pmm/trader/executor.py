@@ -6,7 +6,6 @@ LiveExecutor  — real Kalshi order endpoints. Requires read-write API key.
 from __future__ import annotations
 
 import logging
-import time
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone

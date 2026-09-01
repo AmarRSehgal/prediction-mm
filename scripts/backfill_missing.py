@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import logging
 import sys
-import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -20,7 +19,7 @@ import pandas as pd
 
 from pmm.analysis.depth_metrics import depth_metrics
 from pmm.config import Config
-from pmm.kalshi.client import KalshiAPIError, KalshiClient
+from pmm.kalshi.client import KalshiClient
 
 
 TTE_EDGES = [
