@@ -42,12 +42,14 @@ def count_log_events(log_path: Path) -> dict[str, int]:
 
 def portfolio_snapshot(state_path: Path) -> dict:
     if not state_path.exists():
-        return {"account_value": 10000, "realized": 0, "unrealized": 0,
+        return {"account_value": 3880, "realized": 0, "unrealized": 0,
                 "cash_tied": 0, "open": 0, "tracked": 0, "fills": 0,
-                "best_sub": [], "worst_sub": []}
+                "best_sub": [], "worst_sub": [],
+                "bucket_sub3c": {"realized": 0.0, "unrealized": 0.0, "fills": 0, "open": 0, "tracked": 0},
+                "bucket_ge3c": {"realized": 0.0, "unrealized": 0.0, "fills": 0, "open": 0, "tracked": 0}}
     data = json.loads(state_path.read_text())
     positions = data.get("positions") or {}
-    starting = float(data.get("starting_cash", 10000))
+    starting = float(data.get("starting_cash", 3880))
 
     realized = 0.0
     unrealized = 0.0
@@ -55,6 +57,11 @@ def portfolio_snapshot(state_path: Path) -> dict:
     n_open = 0
     n_fills = 0
     by_sub_net = defaultdict(float)
+    # Spread-bucket split: positions whose first fill came at TOB spread < 3c
+    # vs >= 3c. Lets us evaluate the 1c-min-spread change in isolation.
+    bucket_sub3c = {"realized": 0.0, "unrealized": 0.0, "fills": 0, "open": 0, "tracked": 0}
+    bucket_ge3c  = {"realized": 0.0, "unrealized": 0.0, "fills": 0, "open": 0, "tracked": 0}
+    bucket_unkn  = {"realized": 0.0, "unrealized": 0.0, "fills": 0, "open": 0, "tracked": 0}
     for pos in positions.values():
         qty = int(pos.get("yes_contracts", 0))
         cost = float(pos.get("avg_cost_dollars", 0.0))
@@ -67,8 +74,22 @@ def portfolio_snapshot(state_path: Path) -> dict:
         cash_tied += ct
         if qty != 0:
             n_open += 1
-        n_fills += len(pos.get("fills", []))
+        f = len(pos.get("fills", []))
+        n_fills += f
         by_sub_net[pos.get("subsector", "unknown")] += r + u
+        sp = pos.get("first_fill_spread_c")
+        if sp is None:
+            b = bucket_unkn
+        elif sp < 3:
+            b = bucket_sub3c
+        else:
+            b = bucket_ge3c
+        b["realized"] += r
+        b["unrealized"] += u
+        b["fills"] += f
+        b["tracked"] += 1
+        if qty != 0:
+            b["open"] += 1
 
     sorted_sub = sorted(by_sub_net.items(), key=lambda x: x[1], reverse=True)
     return {
@@ -81,6 +102,8 @@ def portfolio_snapshot(state_path: Path) -> dict:
         "fills": n_fills,
         "best_sub": sorted_sub[:3],
         "worst_sub": sorted_sub[-3:] if len(sorted_sub) > 3 else [],
+        "bucket_sub3c": bucket_sub3c,
+        "bucket_ge3c": bucket_ge3c,
     }
 
 
@@ -133,6 +156,11 @@ def main() -> int:
     print(f"  flatten events  {curr['log_flatten']}  (delta {delta('log_flatten')})")
     print(f"  SKIP-vol events {curr['log_skip']}  (delta {delta('log_skip')})")
     print(f"  errors          {curr['log_errors']}  (delta {delta('log_errors')})")
+    print()
+    b1 = snap["bucket_sub3c"]
+    b2 = snap["bucket_ge3c"]
+    print(f"  sub-3c spread    net ${b1['realized']+b1['unrealized']:+.4f}  (r={b1['realized']:+.3f}  u={b1['unrealized']:+.3f})  fills={b1['fills']}  open={b1['open']}/{b1['tracked']}")
+    print(f"  >=3c spread      net ${b2['realized']+b2['unrealized']:+.4f}  (r={b2['realized']:+.3f}  u={b2['unrealized']:+.3f})  fills={b2['fills']}  open={b2['open']}/{b2['tracked']}")
     print()
     print("  TOP 3 subsectors by net PnL:")
     for s, net in snap["best_sub"]:

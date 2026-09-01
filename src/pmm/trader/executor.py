@@ -113,6 +113,21 @@ class PaperExecutor:
 
         last_seen = self.last_trade_ts.get(ticker)
         queue_bid, queue_ask = self.tob_at_place.get(ticker, (0.0, 0.0))
+        # If any of our open orders is IMPROVING on the real TOB (bid > real
+        # yes_bid, or ask < real yes_ask), we become the new TOB on that side
+        # and there are zero contracts ahead of us. Without this, improving
+        # quotes inherit the 51-100 queue of the level they jumped, and
+        # paper fills never happen.
+        cur_bid_d = current_yes_bid_c / 100.0
+        cur_ask_d = current_yes_ask_c / 100.0
+        for po in self.open_orders.values():
+            if po.intent.ticker != ticker:
+                continue
+            p = po.intent.price_cents / 100.0
+            if po.intent.action == "buy" and po.intent.side == "yes" and p > cur_bid_d:
+                queue_bid = 0.0
+            if po.intent.action == "sell" and po.intent.side == "yes" and p < cur_ask_d:
+                queue_ask = 0.0
         fills: list[Fill] = []
 
         for ts, yp, sz, taker in parsed:
@@ -171,6 +186,67 @@ class PaperExecutor:
                  po.intent.ticker, pos.yes_contracts, pos.realized_pnl)
         if po.filled_count >= po.intent.count:
             self.open_orders.pop(po.order_id, None)
+        return fill
+
+    def force_close(self, ticker: str, subsector: str, pos,
+                     yes_bid_d: float, yes_ask_d: float, reason: str) -> Fill | None:
+        """Unconditional close at real TOB. Used by rule C (hold-time) and
+        similar forced-exit mechanisms. Paper-sim only."""
+        if pos.yes_contracts == 0:
+            return None
+        if yes_bid_d <= 0 or yes_ask_d <= 0:
+            return None
+        direction = 1 if pos.yes_contracts > 0 else -1
+        qty = abs(pos.yes_contracts)
+        exit_price = yes_bid_d if direction == 1 else yes_ask_d
+        action = "sell" if direction == 1 else "buy"
+        fill = Fill(
+            ts=datetime.now(tz=timezone.utc).isoformat(),
+            ticker=ticker, side="yes", action=action,
+            count=qty, price_dollars=exit_price, order_id="FORCE_CLOSE",
+        )
+        pos.add_fill(fill)
+        log.info("FORCE CLOSE %s %d @ $%.2f [%s] cost=$%.2f realized=$%+.2f (%s)",
+                 action, qty, exit_price, ticker, pos.avg_cost_dollars,
+                 pos.realized_pnl, reason)
+        return fill
+
+    def try_aggressive_close(self, ticker: str, subsector: str, pos,
+                              yes_bid_d: float, yes_ask_d: float, mid: float,
+                              min_profit_c: int, adverse_cutoff_c: int) -> Fill | None:
+        """Close position by taking the real TOB if we can lock in profit OR
+        the mid has drifted adversely past the cutoff. Paper-sim only."""
+        if pos.yes_contracts == 0:
+            return None
+        if yes_bid_d <= 0 or yes_ask_d <= 0:
+            return None
+        direction = 1 if pos.yes_contracts > 0 else -1
+        qty = abs(pos.yes_contracts)
+        entry_cost = pos.avg_cost_dollars
+        if direction == 1:
+            # Long YES: sell at real yes_bid
+            exit_price = yes_bid_d
+            profitable = exit_price >= entry_cost + min_profit_c / 100.0
+            drift = mid - entry_cost  # positive = favorable
+        else:
+            # Short YES: buy back at real yes_ask
+            exit_price = yes_ask_d
+            profitable = exit_price <= entry_cost - min_profit_c / 100.0
+            drift = entry_cost - mid  # positive = favorable
+        adverse_override = drift <= -adverse_cutoff_c / 100.0
+        if not (profitable or adverse_override):
+            return None
+        action = "sell" if direction == 1 else "buy"
+        fill = Fill(
+            ts=datetime.now(tz=timezone.utc).isoformat(),
+            ticker=ticker, side="yes", action=action,
+            count=qty, price_dollars=exit_price, order_id="AGG_CLOSE",
+        )
+        pos.add_fill(fill)
+        reason = "profit" if profitable else "adverse"
+        log.info("AGG CLOSE %s %d @ $%.2f [%s] mid=$%.2f cost=$%.2f drift=$%+.3f realized=$%+.2f (%s)",
+                 action, qty, exit_price, ticker, mid, entry_cost, drift,
+                 pos.realized_pnl, reason)
         return fill
 
 

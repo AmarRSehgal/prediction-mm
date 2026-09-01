@@ -34,6 +34,10 @@ class MarketPosition:
     avg_cost_dollars: float = 0.0  # vwap of yes-side cost basis (sign: buying YES adds positive cost)
     realized_pnl: float = 0.0
     last_mid_dollars: float = 0.5  # last observed mid; used for mark-to-market
+    # TOB spread (cents) observed at the moment of our first fill on this
+    # market. Used to bucket PnL by spread regime (e.g. sub-3c vs wider) so
+    # we can separately evaluate the effect of the 1c-min-spread change.
+    first_fill_spread_c: int | None = None
     fills: list[Fill] = field(default_factory=list)
 
     def add_fill(self, fill: Fill) -> None:
@@ -134,6 +138,7 @@ class Portfolio:
                     "avg_cost_dollars": p.avg_cost_dollars,
                     "realized_pnl": p.realized_pnl,
                     "last_mid_dollars": p.last_mid_dollars,
+                    "first_fill_spread_c": p.first_fill_spread_c,
                     "fills": [asdict(f) for f in p.fills],
                 }
                 for t, p in self.positions.items()
@@ -149,6 +154,7 @@ class Portfolio:
                 yes_contracts=d["yes_contracts"], avg_cost_dollars=d["avg_cost_dollars"],
                 realized_pnl=d["realized_pnl"],
                 last_mid_dollars=d.get("last_mid_dollars", 0.5),
+                first_fill_spread_c=d.get("first_fill_spread_c"),
                 fills=[Fill(**f) for f in d.get("fills", [])],
             )
             p.positions[t] = mp

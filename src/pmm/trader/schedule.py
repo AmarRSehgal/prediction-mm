@@ -138,16 +138,17 @@ def compute_window(
         if (now - market_open_time).total_seconds() < min_age_hours * 3600:
             return Window("EXIT", "market too young", None)
 
-    # Sports game-window rule
+    # Sports game-window rule. Pre-game blackout hours is per-subsector
+    # (default 2h, bumped to 8-12h for live-flow heavy sports after
+    # Tuesday 2026-04-22 session).
     if subsector.startswith("sports_"):
         game_start = parse_game_start_utc(ticker, close_time)
         if game_start is not None:
-            # Exit 2h before game start; safe to quote before that
-            game_exit = game_start - timedelta(hours=2)
-            # Game day + 1 day buffer post-game -> stay out until close anyway
+            from pmm.trader.subsector_tuning import get as get_tuning
+            buffer_h = get_tuning(subsector).pre_game_blackout_hours
+            game_exit = game_start - timedelta(hours=buffer_h)
             if now >= game_exit:
-                return Window("EXIT", f"within 2h of game start ({game_start.isoformat()})", game_exit)
-            # Still safe, but check TTE floor
+                return Window("EXIT", f"within {buffer_h:.0f}h of game start ({game_start.isoformat()})", game_exit)
             hours_to_exit = (game_exit - now).total_seconds() / 3600
             if hours_to_exit < 6:
                 return Window("QUIET", f"{hours_to_exit:.1f}h to game-exit", game_exit)

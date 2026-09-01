@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
@@ -11,6 +12,15 @@ from pmm.analysis.taxonomy import classify
 from pmm.kalshi.client import KalshiClient
 
 log = logging.getLogger(__name__)
+
+# Ticker-pattern blacklist (idea 4, 2026-04-22). MENTION-style markets
+# behave like correlated strike ladders within a single event: a word being
+# said resolves ALL mention contracts simultaneously, and our improving
+# quotes can't react fast enough. Observed -$6.36 on baseball_us alone
+# during Tuesday MLB evening play. Also blocking FEDMENTION by extension.
+BLACKLISTED_TICKER_PATTERNS: tuple[re.Pattern, ...] = (
+    re.compile(r"^KX[A-Z]*MENTION"),
+)
 
 
 @dataclass
@@ -91,6 +101,9 @@ def discover_markets(
                 continue
             hrs = (ct - now).total_seconds() / 3600
             if hrs <= 0 or hrs > max_hours_to_close:
+                continue
+            tk = m.get("ticker") or ""
+            if any(pat.match(tk) for pat in BLACKLISTED_TICKER_PATTERNS):
                 continue
             out.append(MarketInfo(
                 ticker=m.get("ticker"),
