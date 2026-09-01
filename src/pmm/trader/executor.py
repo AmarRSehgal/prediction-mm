@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from pmm.kalshi.client import KalshiClient
+from pmm.trader.fees import FeeBook
 from pmm.trader.position import Fill, Portfolio
 
 log = logging.getLogger(__name__)
@@ -50,6 +51,9 @@ class PaperExecutor:
     """
     portfolio: Portfolio
     client: "KalshiClient | None" = None  # injected for trade lookup
+    # Per-series Kalshi fee schedules. An empty book falls back to the standard
+    # quadratic taker schedule with no maker fee, which is the common case.
+    fee_book: FeeBook = field(default_factory=FeeBook)
     open_orders: dict[str, PlacedOrder] = field(default_factory=dict)
     # Per-ticker last-trade-ts we've processed, to avoid duplicate fills
     last_trade_ts: dict[str, datetime] = field(default_factory=dict)
@@ -171,17 +175,24 @@ class PaperExecutor:
         self.tob_at_place[ticker] = (queue_bid, queue_ask)
         return fills
 
+    def _fee(self, ticker: str, price_dollars: float, count: int, is_taker: bool) -> float:
+        return self.fee_book.for_market(ticker).fee_dollars(price_dollars, count, is_taker)
+
     def _execute(self, po: PlacedOrder, price_dollars: float, subsector: str, fill_size: int) -> Fill:
         now = datetime.now(tz=timezone.utc).isoformat()
+        # Our virtual orders always rest, so every matched fill is a maker fill
+        # (zero fee on all but the `quadratic_with_maker_fees` series).
+        fee = self._fee(po.intent.ticker, price_dollars, fill_size, is_taker=False)
         fill = Fill(
             ts=now, ticker=po.intent.ticker, side=po.intent.side, action=po.intent.action,
             count=fill_size, price_dollars=price_dollars, order_id=po.order_id,
+            fee_dollars=fee, is_taker=False,
         )
         pos = self.portfolio.position(po.intent.ticker, subsector)
         pos.add_fill(fill)
         po.filled_count += fill_size
-        log.info("PAPER FILL %s %s %d @ $%.2f (%s) -> inv=%d realized=$%.2f",
-                 po.intent.action, po.intent.side, fill_size, price_dollars,
+        log.info("PAPER FILL %s %s %d @ $%.2f fee=$%.4f (%s) -> inv=%d realized=$%.2f",
+                 po.intent.action, po.intent.side, fill_size, price_dollars, fee,
                  po.intent.ticker, pos.yes_contracts, pos.realized_pnl)
         if po.filled_count >= po.intent.count:
             self.open_orders.pop(po.order_id, None)
@@ -199,14 +210,16 @@ class PaperExecutor:
         qty = abs(pos.yes_contracts)
         exit_price = yes_bid_d if direction == 1 else yes_ask_d
         action = "sell" if direction == 1 else "buy"
+        fee = self._fee(ticker, exit_price, qty, is_taker=True)
         fill = Fill(
             ts=datetime.now(tz=timezone.utc).isoformat(),
             ticker=ticker, side="yes", action=action,
             count=qty, price_dollars=exit_price, order_id="FORCE_CLOSE",
+            fee_dollars=fee, is_taker=True,
         )
         pos.add_fill(fill)
-        log.info("FORCE CLOSE %s %d @ $%.2f [%s] cost=$%.2f realized=$%+.2f (%s)",
-                 action, qty, exit_price, ticker, pos.avg_cost_dollars,
+        log.info("FORCE CLOSE %s %d @ $%.2f fee=$%.4f [%s] cost=$%.2f realized=$%+.2f (%s)",
+                 action, qty, exit_price, fee, ticker, pos.avg_cost_dollars,
                  pos.realized_pnl, reason)
         return fill
 
@@ -222,24 +235,28 @@ class PaperExecutor:
         direction = 1 if pos.yes_contracts > 0 else -1
         qty = abs(pos.yes_contracts)
         entry_cost = pos.avg_cost_dollars
+        # A crossed exit pays a taker fee (~2c/contract mid-band at these
+        # sizes), so "profitable" has to clear the fee as well as the spread.
         if direction == 1:
-            # Long YES: sell at real yes_bid
             exit_price = yes_bid_d
-            profitable = exit_price >= entry_cost + min_profit_c / 100.0
+            fee_c = self._fee(ticker, exit_price, qty, is_taker=True) / qty * 100.0
+            profitable = exit_price >= entry_cost + (min_profit_c + fee_c) / 100.0
             drift = mid - entry_cost  # positive = favorable
         else:
-            # Short YES: buy back at real yes_ask
             exit_price = yes_ask_d
-            profitable = exit_price <= entry_cost - min_profit_c / 100.0
+            fee_c = self._fee(ticker, exit_price, qty, is_taker=True) / qty * 100.0
+            profitable = exit_price <= entry_cost - (min_profit_c + fee_c) / 100.0
             drift = entry_cost - mid  # positive = favorable
         adverse_override = drift <= -adverse_cutoff_c / 100.0
         if not (profitable or adverse_override):
             return None
         action = "sell" if direction == 1 else "buy"
+        fee = self._fee(ticker, exit_price, qty, is_taker=True)
         fill = Fill(
             ts=datetime.now(tz=timezone.utc).isoformat(),
             ticker=ticker, side="yes", action=action,
             count=qty, price_dollars=exit_price, order_id="AGG_CLOSE",
+            fee_dollars=fee, is_taker=True,
         )
         pos.add_fill(fill)
         reason = "profit" if profitable else "adverse"
@@ -256,6 +273,7 @@ class LiveExecutor:
     """Real Kalshi order placement. Requires the KalshiClient's key to have trade scope."""
     client: KalshiClient
     portfolio: Portfolio
+    fee_book: FeeBook = field(default_factory=FeeBook)
     open_orders: dict[str, PlacedOrder] = field(default_factory=dict)
 
     def get_balance(self) -> dict[str, Any]:
@@ -351,11 +369,21 @@ class LiveExecutor:
                 continue
             po = self.open_orders[oid]
             count = int(f.get("count") or 0)
-            price_c = int(f.get("yes_price") or 0) if po.intent.side == "yes" else int(f.get("no_price") or 0)
+            price_d = f.get("yes_price_dollars") if po.intent.side == "yes" else f.get("no_price_dollars")
+            if price_d is not None:
+                price_dollars = float(price_d)
+            else:
+                # Legacy integer-cent fields; these now return None on most
+                # endpoints, hence the _dollars variants above.
+                price_c = int(f.get("yes_price") or 0) if po.intent.side == "yes" else int(f.get("no_price") or 0)
+                price_dollars = price_c / 100.0
+            is_taker = bool(f.get("is_taker", False))
+            fee = self.fee_book.for_market(ticker).fee_dollars(price_dollars, count, is_taker)
             fill = Fill(
                 ts=f.get("created_time", datetime.now(tz=timezone.utc).isoformat()),
                 ticker=ticker, side=po.intent.side, action=po.intent.action,
-                count=count, price_dollars=price_c / 100.0, order_id=oid,
+                count=count, price_dollars=price_dollars, order_id=oid,
+                fee_dollars=fee, is_taker=is_taker,
             )
             self.portfolio.position(ticker, subsector).add_fill(fill)
             fills_out.append(fill)

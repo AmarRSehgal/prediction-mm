@@ -19,6 +19,7 @@ import pandas as pd
 from pmm.kalshi.client import KalshiClient
 from pmm.trader.config import TraderConfig
 from pmm.trader.executor import LiveExecutor, OrderIntent, PaperExecutor
+from pmm.trader.fees import FeeBook
 from pmm.trader.position import load_portfolio, save_portfolio
 from pmm.trader.quoter import compute_quote
 from pmm.trader.risk import assess_market
@@ -48,11 +49,12 @@ class TraderRunner:
         self.client = client
         self.state_path = state_path
         self.series_df = series_df
+        self.fee_book = FeeBook.from_series_frame(series_df)
         self.portfolio = load_portfolio(state_path, starting_cash=tcfg.risk.capital_dollars)
         if tcfg.dry_run:
-            self.executor = PaperExecutor(portfolio=self.portfolio, client=client)
+            self.executor = PaperExecutor(portfolio=self.portfolio, client=client, fee_book=self.fee_book)
         else:
-            self.executor = LiveExecutor(client=client, portfolio=self.portfolio)
+            self.executor = LiveExecutor(client=client, portfolio=self.portfolio, fee_book=self.fee_book)
         self._stop = False
         self._adverse_fills = 0
         # Trend detector: rolling mid history per ticker.
@@ -95,15 +97,17 @@ class TraderRunner:
             else:
                 exit_price = yes_ask if yes_ask is not None else mid + 0.01
                 action = "buy"
+            fee = self.fee_book.for_market(ticker).taker_fee_dollars(exit_price, abs(qty))
             fill = Fill(
                 ts=datetime.now(tz=timezone.utc).isoformat(),
                 ticker=ticker, side="yes", action=action,
                 count=abs(qty), price_dollars=exit_price,
                 order_id=f"paper-flatten-{uuid.uuid4()}",
+                fee_dollars=fee, is_taker=True,
             )
             pos.add_fill(fill)
-            log.info("PAPER FLATTEN %s: %s %d contracts @ $%.2f -> inv=%d realized=$%.4f",
-                     ticker, action, abs(qty), exit_price, pos.yes_contracts, pos.realized_pnl)
+            log.info("PAPER FLATTEN %s: %s %d contracts @ $%.2f fee=$%.4f -> inv=%d realized=$%.4f",
+                     ticker, action, abs(qty), exit_price, fee, pos.yes_contracts, pos.realized_pnl)
             return
         # Live: place a marketable limit at the far side
         if qty > 0:
@@ -120,6 +124,12 @@ class TraderRunner:
         cycle = 0
         log.info("starting trader: dry_run=%s capital=$%.2f targets=%s",
                  self.tcfg.dry_run, self.tcfg.risk.capital_dollars, self.tcfg.target_subsectors)
+        if len(self.fee_book):
+            log.info("fee book: %d series loaded", len(self.fee_book))
+        else:
+            log.warning("fee book EMPTY (series.parquet has no fee_type/fee_multiplier columns). "
+                        "Every series falls back to the no-maker-fee default, which understates "
+                        "cost on maker-fee series. Re-run scripts/sector_scan.py.")
 
         # A stale events_calendar is silently a no-op: every calendar blackout
         # check returns False and one of the three protective layers is simply
@@ -314,6 +324,18 @@ class TraderRunner:
                         if abs(z) > sub_tuning.trend_z_threshold:
                             trend_skip_place = True
 
+                # Fee floor: a passive round trip is free on most series, but
+                # the `quadratic_with_maker_fees` ones charge both legs, and
+                # Kalshi rounds each order's fee UP to a whole cent -- so at
+                # our order sizes the per-contract cost is materially above
+                # the nominal rate. Widen the floor rather than quote through
+                # a spread we cannot keep.
+                fee_sched = self.fee_book.for_market(m.ticker, m.series)
+                min_spread_c = max(
+                    self.tcfg.risk.min_spread_cents,
+                    fee_sched.min_profitable_spread_cents(m.mid, max(1, decision.max_order_size)),
+                )
+
                 quote = compute_quote(
                     mid_dollars=m.mid,
                     inventory_contracts=pos.yes_contracts,
@@ -323,7 +345,7 @@ class TraderRunner:
                     sigma_cents=sigma_c,
                     order_size=decision.max_order_size,
                     params=as_params,
-                    min_spread_cents=self.tcfg.risk.min_spread_cents,
+                    min_spread_cents=min_spread_c,
                 )
 
                 # IMPORTANT: check fills against OLD orders first. If we cancel
@@ -439,8 +461,8 @@ class TraderRunner:
 
             # 5. Status log
             exposure = self.portfolio.total_exposure(mids)
-            log.info("cycle %d: markets=%d total_exposure=$%.2f realized_pnl=$%.2f positions=%d",
-                     cycle, len(universe), exposure, total_pnl,
+            log.info("cycle %d: markets=%d total_exposure=$%.2f realized_pnl=$%.2f (fees=$%.2f) positions=%d",
+                     cycle, len(universe), exposure, total_pnl, self.portfolio.fees_paid_total(),
                      sum(1 for p in self.portfolio.positions.values() if p.yes_contracts != 0))
 
             # 6. Sleep
@@ -454,4 +476,5 @@ class TraderRunner:
         log.info("stopping: cancelling all orders")
         self.executor.cancel_all()
         save_portfolio(self.portfolio, self.state_path)
-        log.info("done. final realized PnL = $%.2f", self.portfolio.realized_pnl_total())
+        log.info("done. final realized PnL = $%.2f net of $%.2f fees",
+                 self.portfolio.realized_pnl_total(), self.portfolio.fees_paid_total())

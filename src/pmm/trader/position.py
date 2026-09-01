@@ -23,6 +23,10 @@ class Fill:
     count: int
     price_dollars: float  # execution price on the side we took
     order_id: str
+    # Kalshi trading fee charged on this fill, in dollars. Already deducted
+    # from realized_pnl by add_fill; kept per-fill so it can be attributed.
+    fee_dollars: float = 0.0
+    is_taker: bool = False
 
 
 @dataclass
@@ -37,12 +41,17 @@ class MarketPosition:
     # market. Used to bucket PnL by spread regime (e.g. sub-3c vs wider) so
     # we can separately evaluate the effect of the 1c-min-spread change.
     first_fill_spread_c: int | None = None
+    fees_paid: float = 0.0
     fills: list[Fill] = field(default_factory=list)
 
     def add_fill(self, fill: Fill) -> None:
         """Update inventory from fill. Convention: all positions tracked in YES-equivalent contracts.
         Buying YES at price p adds to yes_contracts; buying NO at price p subtracts (= selling YES equivalent)."""
         self.fills.append(fill)
+        # Fees are paid on execution regardless of whether the fill opens or
+        # closes, so they hit realized PnL immediately.
+        self.fees_paid += fill.fee_dollars
+        self.realized_pnl -= fill.fee_dollars
         sign = 1 if fill.side == "yes" else -1
         if fill.action == "buy":
             delta = sign * fill.count
@@ -114,7 +123,11 @@ class Portfolio:
         return self.positions[ticker]
 
     def realized_pnl_total(self) -> float:
+        """Net of fees -- add_fill already deducted them."""
         return sum(p.realized_pnl for p in self.positions.values())
+
+    def fees_paid_total(self) -> float:
+        return sum(p.fees_paid for p in self.positions.values())
 
     def total_exposure(self, mids: dict[str, float]) -> float:
         return sum(p.exposure_dollars(mids.get(t, 0.5)) for t, p in self.positions.items())
@@ -138,6 +151,7 @@ class Portfolio:
                     "realized_pnl": p.realized_pnl,
                     "last_mid_dollars": p.last_mid_dollars,
                     "first_fill_spread_c": p.first_fill_spread_c,
+                    "fees_paid": p.fees_paid,
                     "fills": [asdict(f) for f in p.fills],
                 }
                 for t, p in self.positions.items()
@@ -154,6 +168,7 @@ class Portfolio:
                 realized_pnl=d["realized_pnl"],
                 last_mid_dollars=d.get("last_mid_dollars", 0.5),
                 first_fill_spread_c=d.get("first_fill_spread_c"),
+                fees_paid=d.get("fees_paid", 0.0),
                 fills=[Fill(**f) for f in d.get("fills", [])],
             )
             p.positions[t] = mp

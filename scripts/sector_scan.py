@@ -52,10 +52,22 @@ def main() -> int:
             "title": s.get("title"),
             "category": s.get("category"),
             "frequency": s.get("frequency"),
+            # Fee parameters are per-series and only obtainable here. The fee
+            # book (pmm.trader.fees) is built off these two columns.
+            "fee_type": s.get("fee_type") or "quadratic",
+            "fee_multiplier": float(s.get("fee_multiplier") if s.get("fee_multiplier") is not None else 1.0),
             "subsector": classify(s.get("ticker") or "", s.get("title") or ""),
         }
         for s in all_series
     ])
+
+    # series.parquet is what run_trader.py loads to map ticker -> subsector.
+    # Nothing else in the repo wrote it, so it had gone stale by 4 months.
+    (
+        series_df.rename(columns={"series": "ticker"})
+        [["ticker", "title", "category", "frequency", "fee_type", "fee_multiplier", "subsector"]]
+        .to_parquet(cfg.data_dir / "series.parquet")
+    )
 
     # ---- 2. for each series, fetch open markets (single page, 200 max per series)
     log.info("fetching open markets per series (this takes a few minutes)...")
@@ -118,7 +130,10 @@ def main() -> int:
         mkt_df.groupby("series").apply(agg, include_groups=False).reset_index()
         if len(mkt_df) else pd.DataFrame(columns=["series"])
     )
-    per_series = per_series.merge(series_df[["series", "title", "category", "frequency", "subsector"]], on="series", how="left")
+    per_series = per_series.merge(
+        series_df[["series", "title", "category", "frequency", "fee_type", "fee_multiplier", "subsector"]],
+        on="series", how="left",
+    )
     per_series.to_parquet(cfg.data_dir / "sector_scan_series.parquet")
 
     # ---- 4. per-subsector aggregation
