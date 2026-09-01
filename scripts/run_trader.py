@@ -8,6 +8,9 @@ Usage:
   python scripts/run_trader.py                  # paper, forever
   python scripts/run_trader.py --duration 3600  # paper, one hour
   python scripts/run_trader.py --live           # LIVE - real orders
+
+Any exploratory run should pass --state-path; without it the trader appends to
+the canonical paper record, which is the file every PnL report reads.
 """
 from __future__ import annotations
 
@@ -33,6 +36,9 @@ def main() -> int:
     ap.add_argument("--duration", type=float, default=None, help="run time in seconds (default forever)")
     ap.add_argument("--capital", type=float, default=None, help="starting capital in dollars (overrides config)")
     ap.add_argument("--subsectors", nargs="*", default=None, help="override target subsectors")
+    ap.add_argument("--state-path", default=None,
+                    help="portfolio state file. Defaults to the canonical paper/live state; "
+                         "point a smoke test somewhere else so it cannot append to the record.")
     args = ap.parse_args()
 
     logging.basicConfig(
@@ -80,7 +86,11 @@ def main() -> int:
             print("aborted.")
             return 3
 
-    state_path = cfg.data_dir / "trader_state" / ("portfolio_live.json" if args.live else "portfolio_paper.json")
+    if args.state_path:
+        state_path = Path(args.state_path)
+    else:
+        state_path = cfg.data_dir / "trader_state" / ("portfolio_live.json" if args.live else "portfolio_paper.json")
+    print(f"state: {state_path}")
 
     runner = TraderRunner(tcfg=tcfg, client=client, state_path=state_path, series_df=series_df)
     runner.run(duration_seconds=args.duration)
