@@ -1,7 +1,6 @@
 """Game-window scheduling. The golf post-mortem and every subsequent sports
 loss traces back to quoting inside a live event, so the parsers matter.
 """
-import pytest
 from datetime import datetime, timedelta, timezone
 
 from pmm.trader.schedule import compute_window, parse_game_start_utc

@@ -6,7 +6,7 @@ These tests cover the shape of the data and the staleness reporting, not the
 specific dates -- those are sourced from BLS/BEA/the Fed and will need a
 refresh, which `calendar_coverage_days` is what makes visible.
 """
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 
 import pytest
 

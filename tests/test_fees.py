@@ -4,7 +4,6 @@ The two facts that matter for this strategy, and that these tests pin:
 the round-up is per ORDER (so small orders pay a big premium), and the fee
 peaks in the middle of the book (which is the only band we quote in).
 """
-import math
 
 import pytest
 
