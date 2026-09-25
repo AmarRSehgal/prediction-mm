@@ -98,13 +98,20 @@ passive +$0.83).
 days; a treatment with negative realized expectancy per resolved contract after
 200 contracts is stopped; any exposure breach stops the arm until fixed.
 
-Schedule: `com.amar.pmm_paper_session` fires hourly and `run_session.sh` runs
-all three arms together for one 2-hour session per day, in the first hour the
-Mac is awake (`SESSION_S` overrides), via `scripts/paper_launch.py` with
-rotating logs in `logs/paper_<arm>.log`. It then runs `run_report.sh`, which
-scores, validates and pushes `predictions/kalshi_mm_paper.json` to the website.
-A "day" in the comparison is therefore one session; positions are carried
-between sessions and v2 settles anything that resolved in between.
+Schedule: `com.amar.pmm_paper_session` fires every 10 minutes and
+`scripts/session.py` runs all three arms together for 6 hours a day of **awake**
+time (`SESSION_HOURS` overrides), counted on the monotonic clock, which stops
+while the lid is closed. Arms run via `scripts/paper_launch.py` with rotating
+logs in `logs/paper_<arm>.log`. When the budget is spent, `run_report.sh`
+scores, validates and pushes `predictions/kalshi_mm_paper.json`; a "day" in the
+comparison is one session.
+
+Closing the laptop is handled as a disconnect with cancel-on-disconnect, never
+as trading time: v2 (`Engine._on_wake`) voids its resting paper orders,
+re-snapshots the books and restarts its anchors and vol; v1's code is not
+touched, so `paper_launch.py` makes its first paper-venue or flatten call after
+a sleep save the portfolio and exit, and the controller restarts it clean.
+Positions are kept across the gap and anything that resolved meanwhile settles.
 
 State: `research/data/ab/<arm>/` (`portfolio.json`, `fills.jsonl`,
 `settlements.jsonl`, `status.json`) and `research/data/ab/daily.jsonl`.

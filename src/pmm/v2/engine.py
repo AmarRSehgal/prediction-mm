@@ -27,6 +27,7 @@ from pathlib import Path
 import pandas as pd
 
 from pmm.kalshi.client import KalshiClient
+from pmm.sleepwatch import SleepWatch
 from pmm.trader.config import TARGET_SUBSECTORS
 from pmm.trader.events_calendar import is_subsector_blacked_out_by_calendar
 from pmm.trader.fees import FeeBook
@@ -34,7 +35,7 @@ from pmm.trader.position import Fill, load_portfolio, save_portfolio
 from pmm.trader.schedule import compute_window
 from pmm.trader.subsector_tuning import get as get_tuning, is_in_blackout
 from pmm.trader.universe import discover_markets
-from pmm.v2.fairvalue import Anchor, BinanceSpot, EWVar, p_above, prob_sigma_c, twap_t_eff
+from pmm.v2.fairvalue import Anchor, BinanceSpot, EWVar, SpotVol, p_above, prob_sigma_c, twap_t_eff
 from pmm.v2.quote import QUIET, REDUCE_ONLY, TWO_SIDED, EdgeParams, desired_quotes
 from pmm.v2.stream import KalshiStream, Print
 from pmm.v2.venue import PaperVenue
@@ -107,6 +108,7 @@ class Engine:
         self.gates: Counter = Counter()
         self.pending_markouts: list[dict] = []
         self.killed = False
+        self.watch = SleepWatch()
         self._stop = asyncio.Event()
 
     # ---- recording ----
@@ -283,6 +285,9 @@ class Engine:
         while not self._stop.is_set():
             now = time.time()
             now_dt = datetime.now(timezone.utc)
+            slept = self.watch.check()
+            if slept:
+                self._on_wake(now, slept)
             self.venue.advance(now, self.stream.books)
             deltas = self._delta_by_symbol() if self.spot else {}
             fresh = now - self.stream.last_msg < 30 and self.stream.connected_at > 0
@@ -295,6 +300,32 @@ class Engine:
             self._markouts(now)
             self._check_kill()
             await asyncio.sleep(self.cfg.step_s)
+
+    def _on_wake(self, now: float, slept: float):
+        """The laptop was closed: a disconnect with cancel-on-disconnect. Resting paper
+        orders are void, the books are re-snapshotted, and the fair values' memories
+        (anchors, vol, fv variance) restart rather than read the gap as one huge move.
+        Positions are kept; anything that resolved meanwhile settles on the next pass."""
+        self.venue.orders.clear()
+        self.stream.books = {}
+        self.stream._resubscribe.set()
+        for m in self.mkts.values():
+            m.anchor = Anchor()
+            m.fv_var = EWVar(1800.0, 1.0)
+            m.last_var_t = 0.0
+        if self.spot:
+            for sym in list(self.spot.vol):
+                self.spot.vol[sym] = SpotVol(sym)
+                asyncio.get_running_loop().run_in_executor(None, self._seed_quietly, self.spot.vol[sym])
+        self._append("events.jsonl", {"t": now, "event": "wake", "slept_s": round(slept, 1)})
+        log.info("woke after %.0fs asleep: paper orders voided, books and fair values reset", slept)
+
+    @staticmethod
+    def _seed_quietly(v: SpotVol):
+        try:
+            v.seed()
+        except Exception as e:
+            log.warning("vol re-seed %s failed (%s); it will warm from the live feed", v.symbol, e)
 
     def _check_kill(self):
         pnl = sum(p.realized_pnl + p.unrealized_pnl(p.last_mid_dollars) for p in self.portfolio.positions.values())
@@ -331,7 +362,8 @@ class Engine:
                 if str(h) in row["markouts"] or now < row["t"] + h:
                     continue
                 b = self.stream.books.get(row["ticker"])
-                mid = b.mid_c if b else None
+                # A mid read after the laptop slept through the horizon is not a markout.
+                mid = b.mid_c if b and now - (row["t"] + h) <= 5.0 else None
                 s = 1 if row["side"] == "buy" else -1
                 row["markouts"][str(h)] = None if mid is None else s * (mid - row["price_c"])
             (self._append("fills.jsonl", row) if len(row["markouts"]) == len(MARKOUT_S) else keep.append(row))

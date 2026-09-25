@@ -132,3 +132,15 @@ def test_anchor_keeps_kalshi_level():
         a.update(float(t), 0.30, 0.40)
     assert a.value(0.40) == pytest.approx(0.30, abs=1e-6)
     assert a.value(0.45) > 0.30
+
+
+def test_sleepwatch(monkeypatch):
+    from pmm import sleepwatch
+    clock = {"wall": 0.0, "mono": 0.0}
+    monkeypatch.setattr(sleepwatch.time, "time", lambda: clock["wall"])
+    monkeypatch.setattr(sleepwatch.time, "monotonic", lambda: clock["mono"])
+    w = sleepwatch.SleepWatch()
+    clock["wall"] += 3600; clock["mono"] += 1
+    assert w.check() == pytest.approx(3599.0)
+    clock["wall"] += 10; clock["mono"] += 10
+    assert w.check() == 0.0

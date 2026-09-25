@@ -1,6 +1,6 @@
 #!/bin/bash
 set -u
-# Score the paper A/B and publish it to the website. Run by run_session.sh.
+# Score the paper A/B and publish it to the website. Run by scripts/session.py.
 # Mechanism and gotchas: ~/personal/automation/LAUNCHD.md
 
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -14,7 +14,7 @@ notify() { /usr/bin/osascript -e "display notification \"$1\" with title \"predi
 
 {
     echo "=== $(date -u '+%Y-%m-%dT%H:%M:%SZ') report start ==="
-    if env -u PYTHONPATH "$PY" "$PROJECT_DIR/scripts/ab_report.py" --output "$OUT" \
+    if env -u PYTHONPATH "$PY" "$PROJECT_DIR/scripts/ab_report.py" --output "$OUT" ${AB_DATE:+--date "$AB_DATE"} \
         && env -u PYTHONPATH "$PY" "$SITE/.github/scripts/validate_predictions.py" kalshi_mm_paper "$OUT"; then
         cp "$OUT" "$SITE/predictions/kalshi_mm_paper.json"
         git -C "$SITE" add predictions/kalshi_mm_paper.json

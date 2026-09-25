@@ -161,10 +161,10 @@ def score_arm(name: str, pf_path: Path, client, with_markouts: bool) -> dict:
     }
 
 
-def build(data: Path, client, with_markouts: bool = True) -> dict:
+def build(data: Path, client, with_markouts: bool = True, day: str | None = None) -> dict:
     arms = [score_arm(a, data / a / "portfolio.json", client, with_markouts) for a in ARMS]
     daily_path = data / "daily.jsonl"
-    today = datetime.now(timezone.utc).date().isoformat()
+    today = day or datetime.now().date().isoformat()
     rows = [json.loads(x) for x in daily_path.read_text().splitlines()] if daily_path.exists() else []
     rows = [r for r in rows if r["date"] != today] + [{"date": today, **{a["name"]: a["pnl"] for a in arms}}]
     daily_path.write_text("".join(json.dumps(r) + "\n" for r in rows))
@@ -211,10 +211,11 @@ def headline(n_days, arms, comps) -> str:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--output", default=None)
+    ap.add_argument("--date", default=None, help="session day this snapshot belongs to (default today)")
     ap.add_argument("--no-markouts", action="store_true", help="skip the candle fetch (fast, offline-ish)")
     a = ap.parse_args()
     cfg = Config.from_env()
-    doc = build(cfg.data_dir / "ab", KalshiClient.from_config(cfg), not a.no_markouts)
+    doc = build(cfg.data_dir / "ab", KalshiClient.from_config(cfg), not a.no_markouts, a.date)
     print(doc["headline"])
     for r in doc["arms"]:
         print(f"  {r['name']:10} fills={r['fills']:5} pnl={r['pnl']:+8.2f} realized={r['realized']:+8.2f} "
