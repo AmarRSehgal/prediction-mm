@@ -143,7 +143,7 @@ def score_arm(name: str, pf_path: Path, client, with_markouts: bool) -> dict:
                             mk[str(h)].append(s * (mid - f.price_dollars * 100))
     total = sum(per_market)
     realized = pf.realized_pnl_total()
-    passive = by_exit["passive"][0]
+    passive = by_exit.get("passive", [0])[0]
     exits = {k: {"contracts": v[0], "pnl": round(v[1], 2),
                  "per_contract_c": round(100 * v[1] / v[0], 2) if v[0] else None} for k, v in by_exit.items()}
     return {
