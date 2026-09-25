@@ -163,7 +163,8 @@ class KalshiStream:
             url, headers = self._url_headers()
             try:
                 async with websockets.connect(url, additional_headers=headers, ping_interval=10,
-                                              ping_timeout=10, max_size=None, open_timeout=15) as ws:
+                                              ping_timeout=10, max_size=None, max_queue=None,
+                                              open_timeout=15) as ws:
                     self._resubscribe.clear()
                     self.books = {}
                     await ws.send(json.dumps({"id": 1, "cmd": "subscribe", "params": {

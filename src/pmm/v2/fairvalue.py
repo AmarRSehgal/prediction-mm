@@ -168,7 +168,7 @@ class BinanceSpot:
         backoff = 1.0
         while not self._stop:
             try:
-                async with websockets.connect(url, ping_interval=20, ping_timeout=10) as ws:
+                async with websockets.connect(url, ping_interval=20, ping_timeout=10, max_queue=None) as ws:
                     backoff = 1.0
                     async for raw in ws:
                         d = json.loads(raw).get("data") or {}
