@@ -39,3 +39,5 @@ logs/
 .idea/
 .vscode/
 *.swp
+.worktrees/
+web/

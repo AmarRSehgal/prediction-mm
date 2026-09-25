@@ -4,7 +4,7 @@ A Kalshi market-making bot built around an Avellaneda-Stoikov reservation
 price, plus the research that picks which of Kalshi's ~13,700 series are worth
 quoting at all.
 
-## Status (2026-08-31)
+## Status (2026-08-31; A/B below since 2026-09-25)
 
 **Paper only. Not profitable. Do not go live.**
 
@@ -57,6 +57,57 @@ has three defects that explain why (all pinned by `test_KNOWN_BUG_*` tests):
 
 There is also **no fee model anywhere in the repo**. Kalshi's fee is material
 relative to a 1-3c capture, so every PnL number above is optimistic.
+
+## Paper A/B: v1 against v2 (running since 2026-09-25)
+
+The quoter fixes and fee model above were scored only against the recorded
+April tape. To find out whether the code is actually better, three arms now run
+side by side in paper, on the same days:
+
+| arm | code | universe | fair value |
+|---|---|---|---|
+| `baseline` | v1, frozen at tag `paper-ab-baseline`, run from `.worktrees/baseline` | `TARGET_SUBSECTORS` | touch mid (AS) |
+| `v2_niche` | `src/pmm/v2/` | the same | depth-weighted Kalshi mid |
+| `v2_crypto` | `src/pmm/v2/` | KXBTCD / KXETHD hourly strikes | Binance binary model anchored to the Kalshi book |
+
+What v2 changes, each aimed at a measured v1 loss:
+
+- **Never crosses the spread.** No flatten, no forced close. An edge curve in
+  cents skews both quotes against inventory until the reducing side quotes
+  through fair value; anything not quoted out is held to resolution and settled
+  at 0/100 off Kalshi's own `result`. Game windows, blackouts and the calendar
+  switch a market to reduce-only instead of flattening it.
+- **Edge, not a fixed min spread**: base + volatility + days-to-resolution
+  (capital lockup) + skew. A 1c book sits out at flat inventory by construction.
+- **Pushed data.** Books and trades come off the Kalshi websocket; REST is only
+  universe discovery and settlement.
+- **Correlated exposure**: crypto nets $-delta across every strike of an
+  underlying; niche caps gross contracts per event.
+- **Stricter paper venue** (`v2/venue.py`): queue behind the size at its own
+  price, 0.5s ack/cancel latency, whole-contract fills off real prints. This
+  biases the comparison *against* v2.
+
+Scoring is `scripts/ab_report.py`: per-arm PnL net of fees, exits split by path
+(passive / crossed / settled), realized cents per resolved contract, 5m/60m
+markouts from Kalshi candles computed identically for every arm, and a paired
+day-over-day comparison with bootstrap intervals. On the April record it
+reproduces this README's table exactly (Wed session -$33.21: crossed -$34.72,
+passive +$0.83).
+
+**Kill criteria, fixed before the first fill:** no verdict before 14 paired
+days; a treatment with negative realized expectancy per resolved contract after
+200 contracts is stopped; any exposure breach stops the arm until fixed.
+
+Jobs (launchd, `~/personal/automation/install_job.sh`):
+
+| label | what |
+|---|---|
+| `com.amar.pmm_paper_baseline` / `_v2_niche` / `_v2_crypto` | KeepAlive daemons via `scripts/paper_launch.py`; rotating logs in `logs/paper_<arm>.log` |
+| `com.amar.pmm_paper_report` | 08:10 daily: `run_report.sh` scores, validates and pushes `predictions/kalshi_mm_paper.json` to the website |
+
+State: `research/data/ab/<arm>/` (`portfolio.json`, `fills.jsonl`,
+`settlements.jsonl`, `status.json`) and `research/data/ab/daily.jsonl`.
+Paper only: `pmm.v2` has no order path at all.
 
 ## Layout
 
