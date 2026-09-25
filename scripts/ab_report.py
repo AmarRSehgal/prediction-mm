@@ -184,6 +184,11 @@ def build(data: Path, client, with_markouts: bool = True, day: str | None = None
         comps.append({"treatment": t, "control": "baseline", "metric": "pnl_per_day",
                       "diff": round(sum(diff) / n, 3) if n else None, "ci": ci, "verdict": verdict})
     n_days = len(rows) - 1
+    daily, prev = [], {}
+    for r in rows:
+        daily.append({"date": r["date"], "pnl": {a: round(r[a] - prev.get(a, 0.0), 2) for a in ARMS if a in r},
+                      "units": {a: 1 for a in ARMS if a in r}})
+        prev = r
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "experiment": "Kalshi market making: v1 against the v2 engine",
@@ -191,7 +196,7 @@ def build(data: Path, client, with_markouts: bool = True, day: str | None = None
         "unit": "day", "min_units_for_verdict": MIN_DAYS,
         "status": "verdict" if n_days >= MIN_DAYS else "collecting",
         "headline": headline(n_days, arms, comps),
-        "arms": arms, "comparisons": comps, "kill_criteria": KILL, "caveats": CAVEATS,
+        "arms": arms, "comparisons": comps, "daily": daily, "kill_criteria": KILL, "caveats": CAVEATS,
     }
 
 
