@@ -98,12 +98,13 @@ passive +$0.83).
 days; a treatment with negative realized expectancy per resolved contract after
 200 contracts is stopped; any exposure breach stops the arm until fixed.
 
-Jobs (launchd, `~/personal/automation/install_job.sh`):
-
-| label | what |
-|---|---|
-| `com.amar.pmm_paper_baseline` / `_v2_niche` / `_v2_crypto` | KeepAlive daemons via `scripts/paper_launch.py`; rotating logs in `logs/paper_<arm>.log` |
-| `com.amar.pmm_paper_report` | 08:10 daily: `run_report.sh` scores, validates and pushes `predictions/kalshi_mm_paper.json` to the website |
+Schedule: `com.amar.pmm_paper_session` fires hourly and `run_session.sh` runs
+all three arms together for one 2-hour session per day, in the first hour the
+Mac is awake (`SESSION_S` overrides), via `scripts/paper_launch.py` with
+rotating logs in `logs/paper_<arm>.log`. It then runs `run_report.sh`, which
+scores, validates and pushes `predictions/kalshi_mm_paper.json` to the website.
+A "day" in the comparison is therefore one session; positions are carried
+between sessions and v2 settles anything that resolved in between.
 
 State: `research/data/ab/<arm>/` (`portfolio.json`, `fills.jsonl`,
 `settlements.jsonl`, `status.json`) and `research/data/ab/daily.jsonl`.

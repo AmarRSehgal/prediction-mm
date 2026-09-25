@@ -1,6 +1,6 @@
 #!/bin/bash
 set -u
-# Daily: score the paper A/B and publish it to the website.
+# Score the paper A/B and publish it to the website. Run by run_session.sh.
 # Mechanism and gotchas: ~/personal/automation/LAUNCHD.md
 
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -29,14 +29,6 @@ notify() { /usr/bin/osascript -e "display notification \"$1\" with title \"predi
     else
         echo "report FAILED"; notify "paper A/B report failed - see logs/report.log"
     fi
-    # Silence is the failure a daemon has: say so if an arm stopped writing status.
-    for arm in baseline v2_niche v2_crypto; do
-        f="$PROJECT_DIR/research/data/ab/$arm/portfolio.json"
-        [ "$arm" != baseline ] && f="$PROJECT_DIR/research/data/ab/$arm/status.json"
-        if [ ! -f "$f" ] || [ $(( $(date +%s) - $(stat -f %m "$f") )) -gt 7200 ]; then
-            echo "STALE: $arm has not written $f in 2h"; notify "paper arm $arm is not running"
-        fi
-    done
     echo "=== $(date -u '+%Y-%m-%dT%H:%M:%SZ') report end ==="
 } >> "$LOG" 2>&1
 exit 0
