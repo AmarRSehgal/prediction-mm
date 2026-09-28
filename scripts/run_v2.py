@@ -4,8 +4,10 @@
   env -u PYTHONPATH /opt/local/bin/python3.13 scripts/run_v2.py --arm crypto
   env -u PYTHONPATH /opt/local/bin/python3.13 scripts/run_v2.py --arm niche
 
+  ... --arm crypto_ladder | niche_ladder   # the same strategy at five order latencies
+
 State and the fill/settlement record go to research/data/ab/<arm>/ unless
---data-dir says otherwise; point a smoke test somewhere else.
+--data-dir gives another root; point a smoke test somewhere else.
 """
 from __future__ import annotations
 
@@ -22,13 +24,17 @@ import pandas as pd
 from pmm.analysis.taxonomy import classify
 from pmm.config import Config
 from pmm.kalshi.client import KalshiClient
-from pmm.v2.engine import CRYPTO, NICHE, Engine
+from pmm.v2.engine import CRYPTO, CRYPTO_LADDER, NICHE, NICHE_LADDER, Engine
+
+
+ARMS = {"crypto": (CRYPTO,), "niche": (NICHE,),
+        "crypto_ladder": CRYPTO_LADDER, "niche_ladder": NICHE_LADDER}
 
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--arm", choices=("crypto", "niche"), required=True)
-    ap.add_argument("--data-dir", default=None)
+    ap.add_argument("--arm", choices=tuple(ARMS), required=True)
+    ap.add_argument("--data-dir", default=None, help="root holding one directory per arm")
     args = ap.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s [%(name)s] %(message)s")
     for noisy in ("websockets", "urllib3"):
@@ -42,9 +48,8 @@ def main() -> int:
         return 1
     series_df = pd.read_parquet(series_path)
     series_df["subsector"] = series_df.apply(lambda r: classify(r["ticker"] or "", r["title"] or ""), axis=1)
-    arm = CRYPTO if args.arm == "crypto" else NICHE
-    data = Path(args.data_dir) if args.data_dir else cfg.data_dir / "ab" / arm.name
-    asyncio.run(Engine(arm, client, series_df, data).run())
+    root = Path(args.data_dir) if args.data_dir else cfg.data_dir / "ab"
+    asyncio.run(Engine(ARMS[args.arm], client, series_df, root).run())
     return 0
 
 

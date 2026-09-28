@@ -1,4 +1,6 @@
-"""v2 paper engine: one arm per process.
+"""v2 paper engine. One process runs one strategy kind; it may carry several arms
+that differ only in paper order latency (the latency ladder), sharing one feed,
+one universe and one fair value per market, each with its own venue and book.
 
     niche   v1's target universe (TARGET_SUBSECTORS), book-mid fair value
     crypto  KXBTCD / KXETHD hourly strikes, Binance-anchored fair value
@@ -9,8 +11,8 @@ passive quotes, and reconcile them against the paper venue. Fills come off the
 pushed tape. Nothing ever crosses the spread; positions that are not quoted out
 are held to resolution and settled at 0 or 100 from Kalshi's own result.
 
-Everything an analysis needs is appended to <data>/fills.jsonl and
-<data>/settlements.jsonl; portfolio.json is the same Portfolio format v1 writes.
+Everything an analysis needs is appended to <data>/<arm>/fills.jsonl and
+settlements.jsonl; portfolio.json is the same Portfolio format v1 writes.
 """
 from __future__ import annotations
 
@@ -20,7 +22,7 @@ import logging
 import signal
 import time
 from collections import Counter
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -66,6 +68,7 @@ class ArmConfig:
     event_gross_cap: int = 10            # niche: contracts across one event's markets
     strikes_per_expiry: int = 10
     expiries_per_asset: int = 3
+    latency_s: float = 0.5               # paper order ack and cancel latency
 
 
 NICHE = ArmConfig("v2_niche", "niche", EdgeParams(), step_s=2.0, universe_refresh_s=900.0)
@@ -73,6 +76,14 @@ CRYPTO = ArmConfig("v2_crypto", "crypto",
                    EdgeParams(order_size=3, q_max=10, k_base_c=1.0, k_vol=1.0, k_skew_c=2.0,
                               band_lo_c=8, band_hi_c=92),
                    step_s=0.5, universe_refresh_s=300.0)
+
+# Latency ladders: the same strategy at five order latencies from instant to the
+# existing arms' 0.5s, all on a faster step so the rungs differ only in latency.
+LADDER_MS = (0, 125, 250, 375, 500)
+CRYPTO_LADDER = tuple(replace(CRYPTO, name=f"v2_crypto_{ms}ms", latency_s=ms / 1000, step_s=0.1)
+                      for ms in LADDER_MS)
+NICHE_LADDER = tuple(replace(NICHE, name=f"v2_niche_{ms}ms", latency_s=ms / 1000, step_s=0.5)
+                     for ms in LADDER_MS)
 
 
 @dataclass
@@ -93,28 +104,46 @@ def _dt(s):
     return datetime.fromisoformat(s.replace("Z", "+00:00")) if s else None
 
 
-class Engine:
-    def __init__(self, cfg: ArmConfig, client: KalshiClient, series_df: pd.DataFrame, data_dir: Path):
+class Arm:
+    """One latency rung: its own paper venue, portfolio, record and kill switch."""
+
+    def __init__(self, cfg: ArmConfig, data: Path):
         cfg.edge.check()
-        self.cfg, self.client, self.series_df = cfg, client, series_df
-        self.data = data_dir
-        self.data.mkdir(parents=True, exist_ok=True)
-        self.fee_book = FeeBook.from_series_frame(series_df)
-        self.portfolio = load_portfolio(self.data / "portfolio.json", starting_cash=cfg.capital_dollars)
-        self.venue = PaperVenue()
-        self.stream = KalshiStream(client, self._on_print)
-        self.spot = BinanceSpot(tuple(CRYPTO_SERIES.values())) if cfg.kind == "crypto" else None
-        self.mkts: dict[str, Mkt] = {}
+        self.cfg, self.data = cfg, data
+        data.mkdir(parents=True, exist_ok=True)
+        self.portfolio = load_portfolio(data / "portfolio.json", starting_cash=cfg.capital_dollars)
+        self.venue = PaperVenue(ack_s=cfg.latency_s, cancel_s=cfg.latency_s)
         self.gates: Counter = Counter()
         self.pending_markouts: list[dict] = []
         self.killed = False
-        self.watch = SleepWatch()
-        self._stop = asyncio.Event()
 
-    # ---- recording ----
-    def _append(self, name: str, row: dict):
+    def append(self, name: str, row: dict):
         with open(self.data / name, "a") as f:
             f.write(json.dumps(row, default=str) + "\n")
+
+    def held(self, ticker: str) -> bool:
+        p = self.portfolio.positions.get(ticker)
+        return bool(p and p.yes_contracts)
+
+
+class Engine:
+    def __init__(self, cfgs: tuple[ArmConfig, ...] | ArmConfig, client: KalshiClient,
+                 series_df: pd.DataFrame, data_root: Path):
+        cfgs = (cfgs,) if isinstance(cfgs, ArmConfig) else tuple(cfgs)
+        base = cfgs[0]
+        # Arms in one process share the feed, the universe and the fair value, so they
+        # may differ in nothing but name and latency. Anything else is a config error.
+        for c in cfgs[1:]:
+            if replace(c, name=base.name, latency_s=base.latency_s) != base:
+                raise ValueError(f"{c.name} differs from {base.name} in more than latency")
+        self.cfg, self.client, self.series_df = base, client, series_df
+        self.arms = [Arm(c, data_root / c.name) for c in cfgs]
+        self.fee_book = FeeBook.from_series_frame(series_df)
+        self.stream = KalshiStream(client, self._on_print)
+        self.spot = BinanceSpot(tuple(CRYPTO_SERIES.values())) if base.kind == "crypto" else None
+        self.mkts: dict[str, Mkt] = {}
+        self.watch = SleepWatch()
+        self._stop = asyncio.Event()
 
     # ---- universe ----
     def _discover_niche(self) -> list[Mkt]:
@@ -152,8 +181,7 @@ class Engine:
             try:
                 fn = self._discover_crypto if self.cfg.kind == "crypto" else self._discover_niche
                 found = await asyncio.to_thread(fn)
-                keep = {t: m for t, m in self.mkts.items()
-                        if self.portfolio.positions.get(t) and self.portfolio.positions[t].yes_contracts}
+                keep = {t: m for t, m in self.mkts.items() if any(a.held(t) for a in self.arms)}
                 fresh = {m.ticker: self.mkts.get(m.ticker, m) for m in found}
                 self.mkts = {**fresh, **keep}
                 self.stream.set_tickers(self.mkts)
@@ -166,28 +194,29 @@ class Engine:
                 pass
 
     # ---- per-market decision ----
-    def _mode(self, m: Mkt, now: datetime) -> str:
+    def _pulled(self, m: Mkt, now: datetime) -> bool:
         if now >= m.close_time:
-            return PULLED
+            return True
+        return self.cfg.kind == "crypto" and (m.close_time - now).total_seconds() < self.cfg.pull_before_close_s
+
+    def _mode(self, arm: Arm, m: Mkt, now: datetime) -> str:
         if self.cfg.kind == "crypto":
-            if (m.close_time - now).total_seconds() < self.cfg.pull_before_close_s:
-                return PULLED
-            return REDUCE_ONLY if self.killed else TWO_SIDED
+            return REDUCE_ONLY if arm.killed else TWO_SIDED
         # v1 flattened across the spread in all of these; v2 only stops adding.
         win = compute_window(m.ticker, m.subsector, m.close_time, now)
         tune = get_tuning(m.subsector)
         hrs = (m.close_time - now).total_seconds() / 3600
-        if (self.killed or win.state in ("EXIT", "CLOSED") or is_in_blackout(m.subsector, now.hour, now.weekday())
+        if (arm.killed or win.state in ("EXIT", "CLOSED") or is_in_blackout(m.subsector, now.hour, now.weekday())
                 or is_subsector_blacked_out_by_calendar(m.subsector, now)[0]
                 or (tune.skip_if_close_within_hours and hrs < tune.skip_if_close_within_hours)):
             return REDUCE_ONLY
         return QUIET if win.state == "QUIET" else TWO_SIDED
 
-    def _delta_by_symbol(self) -> dict[str, float]:
+    def _delta_by_symbol(self, arm: Arm) -> dict[str, float]:
         """$ PnL for a +1% spot move, summed over every held strike of each underlying."""
         out: dict[str, float] = {}
         now = time.time()
-        for t, pos in self.portfolio.positions.items():
+        for t, pos in arm.portfolio.positions.items():
             m = self.mkts.get(t)
             if not m or not m.symbol or not pos.yes_contracts:
                 continue
@@ -200,7 +229,7 @@ class Engine:
         return out
 
     def _fair(self, m: Mkt, book, now: float) -> tuple[str | None, float | None, float]:
-        """(gate, fair value cents, sigma cents)."""
+        """(gate, fair value cents, sigma cents). Once per market per step, shared by every arm."""
         mid = book.mid_c
         if self.cfg.kind == "niche":
             fv = book.impact_mid(self.cfg.impact_depth)
@@ -225,61 +254,70 @@ class Engine:
             return "fv_gap", None, 0.0
         return None, fv, prob_sigma_c(S, m.strike, te, vol.annual, 10.0)
 
-    def _step_market(self, m: Mkt, now: float, now_dt: datetime, deltas: dict[str, float]):
-        mode = self._mode(m, now_dt)
-        book = self.stream.books.get(m.ticker)
-        if mode == PULLED:
-            self.venue.cancel_ticker(now, m.ticker)
-            self.gates[PULLED] += 1
-            return
-        if book is None or book.mid_c is None:
-            self.venue.cancel_ticker(now, m.ticker)
-            self.gates["no_book" if book is None else "book_one_sided"] += 1
-            return
-        pos = self.portfolio.position(m.ticker, m.subsector)
+    def _quote(self, arm: Arm, m: Mkt, book, fv: float, sigma: float, now: float, now_dt: datetime,
+               deltas: dict[str, float]):
+        cfg = arm.cfg
+        mode = self._mode(arm, m, now_dt)
+        pos = arm.portfolio.position(m.ticker, m.subsector)
         pos.last_mid_dollars = book.mid_c / 100.0
-        blocked, fv, sigma = self._fair(m, book, now)
-        if blocked:
-            self.venue.cancel_ticker(now, m.ticker)
-            self.gates[blocked] += 1
-            return
-        q = pos.yes_contracts / self.cfg.edge.q_max
+        q = pos.yes_contracts / cfg.edge.q_max
         side_block: set[str] = set()
-        if self.cfg.kind == "crypto":
+        if cfg.kind == "crypto":
             d = deltas.get(m.symbol, 0.0)
-            q = 0.5 * q + 0.5 * max(-1.0, min(1.0, d / self.cfg.delta_cap_dollars))
-            if d >= self.cfg.delta_cap_dollars:
+            q = 0.5 * q + 0.5 * max(-1.0, min(1.0, d / cfg.delta_cap_dollars))
+            if d >= cfg.delta_cap_dollars:
                 side_block.add("buy")
-            if d <= -self.cfg.delta_cap_dollars:
+            if d <= -cfg.delta_cap_dollars:
                 side_block.add("sell")
         else:
-            gross = sum(abs(p.yes_contracts) for t, p in self.portfolio.positions.items()
+            gross = sum(abs(p.yes_contracts) for t, p in arm.portfolio.positions.items()
                         if t.rsplit("-", 1)[0] == m.event)
-            if gross >= self.cfg.event_gross_cap:
+            if gross >= cfg.event_gross_cap:
                 mode = REDUCE_ONLY
         days = (m.close_time - now_dt).total_seconds() / 86400
         bid, ask = desired_quotes(fv, sigma, pos.yes_contracts, q, book.best_bid, book.best_ask,
-                                  days, mode, self.cfg.edge)
-        self.gates["quoting_" + mode] += 1
+                                  days, mode, cfg.edge)
+        arm.gates["quoting_" + mode] += 1
         for side, qt in (("buy", bid), ("sell", ask)):
-            w = self.venue.working(m.ticker, side)
+            w = arm.venue.working(m.ticker, side)
             if qt is None or side in side_block:
                 if w:
-                    self.venue.cancel(now, w.oid)
+                    arm.venue.cancel(now, w.oid)
                 continue
             if w is not None:
-                if (abs(w.price_c - qt.price_c) >= self.cfg.replace_ticks or w.size != qt.size) \
-                        and now - w.sent_t >= self.cfg.min_order_life_s:
-                    self.venue.cancel(now, w.oid)
+                if (abs(w.price_c - qt.price_c) >= cfg.replace_ticks or w.size != qt.size) \
+                        and now - w.sent_t >= cfg.min_order_life_s:
+                    arm.venue.cancel(now, w.oid)
                 continue
             s = 1 if side == "buy" else -1
             adds = s * pos.yes_contracts >= 0
-            inflight = self.venue.pending(m.ticker, side)
-            if adds and s * pos.yes_contracts + inflight + qt.size > self.cfg.edge.q_max:
+            inflight = arm.venue.pending(m.ticker, side)
+            if adds and s * pos.yes_contracts + inflight + qt.size > cfg.edge.q_max:
                 continue
             if not adds and inflight + qt.size > abs(pos.yes_contracts):
                 continue
-            self.venue.place(now, m.ticker, side, qt.price_c, qt.size, qt.tactic, fv)
+            arm.venue.place(now, m.ticker, side, qt.price_c, qt.size, qt.tactic, fv)
+
+    def _pull(self, m: Mkt, now: float, gate: str):
+        for arm in self.arms:
+            arm.venue.cancel_ticker(now, m.ticker)
+            arm.gates[gate] += 1
+
+    def _step_market(self, m: Mkt, now: float, now_dt: datetime, deltas: dict[str, dict[str, float]]):
+        if self._pulled(m, now_dt):
+            return self._pull(m, now, PULLED)
+        book = self.stream.books.get(m.ticker)
+        if book is None or book.mid_c is None:
+            return self._pull(m, now, "no_book" if book is None else "book_one_sided")
+        for arm in self.arms:          # mark-to-mid even while a gate keeps the market quiet
+            p = arm.portfolio.positions.get(m.ticker)
+            if p is not None:
+                p.last_mid_dollars = book.mid_c / 100.0
+        blocked, fv, sigma = self._fair(m, book, now)
+        if blocked:
+            return self._pull(m, now, blocked)
+        for arm in self.arms:
+            self._quote(arm, m, book, fv, sigma, now, now_dt, deltas[arm.cfg.name])
 
     async def _decide(self):
         while not self._stop.is_set():
@@ -288,17 +326,18 @@ class Engine:
             slept = self.watch.check()
             if slept:
                 self._on_wake(now, slept)
-            self.venue.advance(now, self.stream.books)
-            deltas = self._delta_by_symbol() if self.spot else {}
+            for arm in self.arms:
+                arm.venue.advance(now, self.stream.books)
+            deltas = {a.cfg.name: (self._delta_by_symbol(a) if self.spot else {}) for a in self.arms}
             fresh = now - self.stream.last_msg < 30 and self.stream.connected_at > 0
             for m in list(self.mkts.values()):
                 if fresh:
                     self._step_market(m, now, now_dt, deltas)
                 else:
-                    self.venue.cancel_ticker(now, m.ticker)
-                    self.gates["stream_stale"] += 1
-            self._markouts(now)
-            self._check_kill()
+                    self._pull(m, now, "stream_stale")
+            for arm in self.arms:
+                self._markouts(arm, now)
+                self._check_kill(arm)
             await asyncio.sleep(self.cfg.step_s)
 
     def _on_wake(self, now: float, slept: float):
@@ -306,7 +345,9 @@ class Engine:
         orders are void, the books are re-snapshotted, and the fair values' memories
         (anchors, vol, fv variance) restart rather than read the gap as one huge move.
         Positions are kept; anything that resolved meanwhile settles on the next pass."""
-        self.venue.orders.clear()
+        for arm in self.arms:
+            arm.venue.orders.clear()
+            arm.append("events.jsonl", {"t": now, "event": "wake", "slept_s": round(slept, 1)})
         self.stream.books = {}
         self.stream._resubscribe.set()
         for m in self.mkts.values():
@@ -317,7 +358,6 @@ class Engine:
             for sym in list(self.spot.vol):
                 self.spot.vol[sym] = SpotVol(sym)
                 asyncio.get_running_loop().run_in_executor(None, self._seed_quietly, self.spot.vol[sym])
-        self._append("events.jsonl", {"t": now, "event": "wake", "slept_s": round(slept, 1)})
         log.info("woke after %.0fs asleep: paper orders voided, books and fair values reset", slept)
 
     @staticmethod
@@ -327,37 +367,39 @@ class Engine:
         except Exception as e:
             log.warning("vol re-seed %s failed (%s); it will warm from the live feed", v.symbol, e)
 
-    def _check_kill(self):
-        pnl = sum(p.realized_pnl + p.unrealized_pnl(p.last_mid_dollars) for p in self.portfolio.positions.values())
-        if not self.killed and pnl < -self.cfg.max_loss_dollars:
-            self.killed = True
-            log.error("KILL: session PnL $%.2f below -$%.2f; reduce-only everywhere", pnl, self.cfg.max_loss_dollars)
-            self._append("events.jsonl", {"t": time.time(), "event": "kill", "pnl": pnl})
+    def _check_kill(self, arm: Arm):
+        pnl = sum(p.realized_pnl + p.unrealized_pnl(p.last_mid_dollars) for p in arm.portfolio.positions.values())
+        if not arm.killed and pnl < -arm.cfg.max_loss_dollars:
+            arm.killed = True
+            log.error("KILL %s: session PnL $%.2f below -$%.2f; reduce-only everywhere",
+                      arm.cfg.name, pnl, arm.cfg.max_loss_dollars)
+            arm.append("events.jsonl", {"t": time.time(), "event": "kill", "pnl": pnl})
 
     # ---- fills ----
     def _on_print(self, pr: Print):
         m = self.mkts.get(pr.ticker)
         if m is None:
             return
-        for f in self.venue.on_print(pr):
-            pos = self.portfolio.position(f.ticker, m.subsector)
-            fee = self.fee_book.for_market(f.ticker, m.series).fee_dollars(f.price_c / 100.0, int(f.size), False)
-            pos.add_fill(Fill(ts=datetime.fromtimestamp(f.t, timezone.utc).isoformat(), ticker=f.ticker,
-                              side="yes", action=f.side, count=int(f.size), price_dollars=f.price_c / 100.0,
-                              order_id=f"v2-{f.oid}", fee_dollars=fee, is_taker=False))
-            book = self.stream.books.get(f.ticker)
-            self.pending_markouts.append({
-                "arm": self.cfg.name, "t": f.t, "ticker": f.ticker, "subsector": m.subsector,
-                "side": f.side, "price_c": f.price_c, "size": f.size, "fee": fee, "tactic": f.tactic,
-                "fv_at_place_c": f.fv_at_place_c, "age_s": f.t - f.placed_t,
-                "mid_c": book.mid_c if book else None, "position": pos.yes_contracts,
-                "hours_to_close": (m.close_time.timestamp() - f.t) / 3600, "markouts": {}})
-            log.info("FILL %s %s %d @ %dc (%s) -> pos %d", f.ticker, f.side, f.size, f.price_c, f.tactic,
-                     pos.yes_contracts)
+        for arm in self.arms:
+            for f in arm.venue.on_print(pr):
+                pos = arm.portfolio.position(f.ticker, m.subsector)
+                fee = self.fee_book.for_market(f.ticker, m.series).fee_dollars(f.price_c / 100.0, int(f.size), False)
+                pos.add_fill(Fill(ts=datetime.fromtimestamp(f.t, timezone.utc).isoformat(), ticker=f.ticker,
+                                  side="yes", action=f.side, count=int(f.size), price_dollars=f.price_c / 100.0,
+                                  order_id=f"v2-{f.oid}", fee_dollars=fee, is_taker=False))
+                book = self.stream.books.get(f.ticker)
+                arm.pending_markouts.append({
+                    "arm": arm.cfg.name, "t": f.t, "ticker": f.ticker, "subsector": m.subsector,
+                    "side": f.side, "price_c": f.price_c, "size": f.size, "fee": fee, "tactic": f.tactic,
+                    "fv_at_place_c": f.fv_at_place_c, "age_s": f.t - f.placed_t,
+                    "mid_c": book.mid_c if book else None, "position": pos.yes_contracts,
+                    "hours_to_close": (m.close_time.timestamp() - f.t) / 3600, "markouts": {}})
+                log.info("FILL %s %s %s %d @ %dc (%s) -> pos %d", arm.cfg.name, f.ticker, f.side, f.size,
+                         f.price_c, f.tactic, pos.yes_contracts)
 
-    def _markouts(self, now: float):
+    def _markouts(self, arm: Arm, now: float):
         keep = []
-        for row in self.pending_markouts:
+        for row in arm.pending_markouts:
             for h in MARKOUT_S:
                 if str(h) in row["markouts"] or now < row["t"] + h:
                     continue
@@ -366,32 +408,38 @@ class Engine:
                 mid = b.mid_c if b and now - (row["t"] + h) <= 5.0 else None
                 s = 1 if row["side"] == "buy" else -1
                 row["markouts"][str(h)] = None if mid is None else s * (mid - row["price_c"])
-            (self._append("fills.jsonl", row) if len(row["markouts"]) == len(MARKOUT_S) else keep.append(row))
-        self.pending_markouts = keep
+            (arm.append("fills.jsonl", row) if len(row["markouts"]) == len(MARKOUT_S) else keep.append(row))
+        arm.pending_markouts = keep
 
     # ---- settlement ----
     def _settle_once(self):
         now = datetime.now(timezone.utc)
-        for t, pos in list(self.portfolio.positions.items()):
-            m = self.mkts.get(t)
-            if not pos.yes_contracts or (m and now < m.close_time):
-                continue
-            try:
-                mk = self.client.get_market(t).get("market") or {}
-            except Exception as e:
-                log.warning("settle lookup %s: %s", t, e)
-                continue
-            if mk.get("result") not in ("yes", "no"):
-                continue
-            px = 1.0 if mk["result"] == "yes" else 0.0
-            qty = pos.yes_contracts
-            pos.add_fill(Fill(ts=now.isoformat(), ticker=t, side="yes", action="sell" if qty > 0 else "buy",
-                              count=abs(qty), price_dollars=px, order_id="SETTLE"))
-            pos.last_mid_dollars = px
-            self._append("settlements.jsonl", {"t": time.time(), "ticker": t, "result": mk["result"],
-                                               "contracts": qty, "realized_after": pos.realized_pnl})
-            log.info("SETTLED %s %s: %+d contracts, market realized $%.2f", t, mk["result"], qty, pos.realized_pnl)
-            self.mkts.pop(t, None)
+        results: dict[str, str | None] = {}
+        for arm in self.arms:
+            for t, pos in list(arm.portfolio.positions.items()):
+                m = self.mkts.get(t)
+                if not pos.yes_contracts or (m and now < m.close_time):
+                    continue
+                if t not in results:
+                    try:
+                        results[t] = (self.client.get_market(t).get("market") or {}).get("result")
+                    except Exception as e:
+                        log.warning("settle lookup %s: %s", t, e)
+                        results[t] = None
+                if results[t] not in ("yes", "no"):
+                    continue
+                px = 1.0 if results[t] == "yes" else 0.0
+                qty = pos.yes_contracts
+                pos.add_fill(Fill(ts=now.isoformat(), ticker=t, side="yes", action="sell" if qty > 0 else "buy",
+                                  count=abs(qty), price_dollars=px, order_id="SETTLE"))
+                pos.last_mid_dollars = px
+                arm.append("settlements.jsonl", {"t": time.time(), "ticker": t, "result": results[t],
+                                                 "contracts": qty, "realized_after": pos.realized_pnl})
+                log.info("SETTLED %s %s %s: %+d contracts, market realized $%.2f", arm.cfg.name, t,
+                         results[t], qty, pos.realized_pnl)
+        for t, r in results.items():
+            if r in ("yes", "no") and not any(a.held(t) for a in self.arms):
+                self.mkts.pop(t, None)
 
     async def _housekeeping(self):
         while not self._stop.is_set():
@@ -399,25 +447,26 @@ class Engine:
                 await asyncio.to_thread(self._settle_once)
             except Exception:
                 log.exception("settlement pass failed")
-            save_portfolio(self.portfolio, self.data / "portfolio.json")
-            self._write_status()
+            for arm in self.arms:
+                save_portfolio(arm.portfolio, arm.data / "portfolio.json")
+                self._write_status(arm)
             try:
                 await asyncio.wait_for(self._stop.wait(), 60)
             except asyncio.TimeoutError:
                 pass
 
-    def _write_status(self):
-        pf = self.portfolio
-        doc = {"t": time.time(), "arm": self.cfg.name, "markets": len(self.mkts),
+    def _write_status(self, arm: Arm):
+        pf = arm.portfolio
+        doc = {"t": time.time(), "arm": arm.cfg.name, "latency_s": arm.cfg.latency_s, "markets": len(self.mkts),
                "books": len(self.stream.books), "ws_gaps": self.stream.gaps,
                "last_ws_msg_age_s": time.time() - self.stream.last_msg if self.stream.last_msg else None,
-               "open_orders": len(self.venue.orders), "killed": self.killed,
+               "open_orders": len(arm.venue.orders), "killed": arm.killed,
                "realized": pf.realized_pnl_total(), "fees": pf.fees_paid_total(),
                "positions": sum(1 for p in pf.positions.values() if p.yes_contracts),
-               "gates": dict(self.gates)}
-        tmp = self.data / "status.json.tmp"
+               "gates": dict(arm.gates)}
+        tmp = arm.data / "status.json.tmp"
         tmp.write_text(json.dumps(doc, indent=1))
-        tmp.replace(self.data / "status.json")
+        tmp.replace(arm.data / "status.json")
 
     async def run(self):
         if self.spot:
@@ -441,6 +490,7 @@ class Engine:
         for t in tasks:
             t.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
-        for row in self.pending_markouts:
-            self._append("fills.jsonl", row)
-        save_portfolio(self.portfolio, self.data / "portfolio.json")
+        for arm in self.arms:
+            for row in arm.pending_markouts:
+                arm.append("fills.jsonl", row)
+            save_portfolio(arm.portfolio, arm.data / "portfolio.json")

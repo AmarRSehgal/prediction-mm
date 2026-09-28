@@ -20,8 +20,8 @@ WORKTREE = REPO / ".worktrees" / "baseline"
 AB = REPO / "research" / "data" / "ab"
 
 arm = sys.argv[1] if len(sys.argv) > 1 else ""
-if arm not in ("baseline", "crypto", "niche"):
-    sys.exit("usage: paper_launch.py baseline|crypto|niche")
+if arm not in ("baseline", "crypto", "niche", "crypto_ladder", "niche_ladder"):
+    sys.exit("usage: paper_launch.py baseline|crypto|niche|crypto_ladder|niche_ladder")
 
 (REPO / "logs").mkdir(exist_ok=True)
 h = logging.handlers.RotatingFileHandler(REPO / "logs" / f"paper_{arm}.log", maxBytes=20_000_000, backupCount=3)

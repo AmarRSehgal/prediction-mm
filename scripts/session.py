@@ -29,7 +29,7 @@ STATE = LOGS / "session_state.json"
 PY = os.environ.get("JOB_PYTHON", "/opt/local/bin/python3.13")
 BUDGET_S = float(os.environ.get("SESSION_HOURS", "6")) * 3600
 TICK_S = 10.0
-ARMS = {a: [PY, str(HERE / "scripts" / "paper_launch.py"), a] for a in ("baseline", "crypto", "niche")}
+ARMS = {a: [PY, str(HERE / "scripts" / "paper_launch.py"), a] for a in ("baseline", "crypto", "niche", "crypto_ladder", "niche_ladder")}
 PUBLISH = ["/bin/bash", str(HERE / "run_report.sh")]
 
 

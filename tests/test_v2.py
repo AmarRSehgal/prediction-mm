@@ -144,3 +144,37 @@ def test_sleepwatch(monkeypatch):
     assert w.check() == pytest.approx(3599.0)
     clock["wall"] += 10; clock["mono"] += 10
     assert w.check() == 0.0
+
+
+def _engine(tmp_path, cfgs):
+    import pandas as pd
+    from pmm.v2.engine import Engine
+    return Engine(cfgs, None, pd.DataFrame(), tmp_path)
+
+
+def test_ladder_arms_differ_only_in_latency(tmp_path):
+    from dataclasses import replace
+    from pmm.v2.engine import CRYPTO_LADDER
+    e = _engine(tmp_path, CRYPTO_LADDER)
+    assert [a.cfg.latency_s for a in e.arms] == [0.0, 0.125, 0.25, 0.375, 0.5]
+    assert all((tmp_path / a.cfg.name).is_dir() for a in e.arms)
+    bad = (CRYPTO_LADDER[0], replace(CRYPTO_LADDER[1], step_s=2.0))
+    with pytest.raises(ValueError):
+        _engine(tmp_path, bad)
+
+
+def test_one_print_fills_the_fast_rung_not_the_slow_one(tmp_path):
+    from datetime import datetime, timedelta, timezone
+    from pmm.v2.engine import CRYPTO_LADDER, Mkt
+    e = _engine(tmp_path, (CRYPTO_LADDER[0], CRYPTO_LADDER[-1]))
+    t = "KXBTCD-X-T1"
+    e.mkts[t] = Mkt(t, "crypto_btc", "KXBTCD", "KXBTCD-X", datetime.now(timezone.utc) + timedelta(hours=2))
+    b = book()
+    e.stream.books[t] = b
+    for arm in e.arms:
+        arm.venue.place(0.0, t, "sell", 44, 3, "improve", 42.0)
+        arm.venue.advance(0.0, e.stream.books)
+    e._on_print(Print(0.2, t, "buy", 44, 5.0))
+    fast, slow = e.arms
+    assert fast.portfolio.positions[t].yes_contracts == -3
+    assert t not in slow.portfolio.positions

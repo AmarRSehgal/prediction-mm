@@ -43,6 +43,11 @@ ARMS = {
     "v2_crypto": ("treatment", "v2 engine on hourly BTC/ETH strike ladders, fair value from Binance "
                                "anchored to the Kalshi book, exposure netted across strikes."),
 }
+LADDER_MS = (0, 125, 250, 375, 500)
+for _k in ("crypto", "niche"):
+    for _ms in LADDER_MS:
+        ARMS[f"v2_{_k}_{_ms}ms"] = ("treatment", f"v2_{_k} at {_ms}ms order latency on a faster re-quote step "
+                                                 "(latency ladder).")
 KILL = [f"A treatment whose realized expectancy per resolved contract is negative after {MIN_CONTRACTS} "
         "contracts is stopped.",
         "Any aggregate exposure breach, or a position held into a resolution rule nobody read, stops "
@@ -161,8 +166,53 @@ def score_arm(name: str, pf_path: Path, client, with_markouts: bool) -> dict:
     }
 
 
+def live_markouts(path: Path) -> dict | None:
+    """Mean markout in cents at each horizon the engine recorded, from its own books."""
+    if not path.exists():
+        return None
+    acc = defaultdict(list)
+    for line in path.read_text().splitlines():
+        try:
+            row = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        for h, v in (row.get("markouts") or {}).items():
+            if v is not None:
+                acc[h].append(v)
+    return {h: round(sum(v) / len(v), 3) for h, v in sorted(acc.items(), key=lambda kv: int(kv[0]))} or None
+
+
+def ladder_of(name: str) -> dict | None:
+    if not name.endswith("ms"):
+        return None
+    strat, ms = name.rsplit("_", 1)
+    return {"strategy": strat, "latency_ms": int(ms[:-2])}
+
+
+def latency_curve(arms: list[dict]) -> list[dict]:
+    by = {a["name"]: a for a in arms}
+    out = []
+    for strat in ("v2_crypto", "v2_niche"):
+        rungs = []
+        for ms in LADDER_MS:
+            a = by[f"{strat}_{ms}ms"]
+            ex = a["exits"]
+            rungs.append({"latency_ms": ms, "arm": a["name"], "fills": a["fills"], "pnl": a["pnl"],
+                          "realized_per_resolved_c": a["realized_per_resolved_c"],
+                          "passive_per_contract_c": (ex.get("passive") or {}).get("per_contract_c"),
+                          "settled_per_contract_c": (ex.get("settled") or {}).get("per_contract_c"),
+                          "markout_c": (a["live_markouts_c"] or {}).get("60")})
+        out.append({"strategy": strat, "markout_horizon_s": 60, "rungs": rungs})
+    return out
+
+
 def build(data: Path, client, with_markouts: bool = True, day: str | None = None) -> dict:
-    arms = [score_arm(a, data / a / "portfolio.json", client, with_markouts) for a in ARMS]
+    # Candle markouts cost one request per market, so only the three original arms pay
+    # for them; every v2 arm (ladder included) also carries its own live markouts.
+    arms = [score_arm(a, data / a / "portfolio.json", client, with_markouts and "ms" not in a) for a in ARMS]
+    for a in arms:
+        a["live_markouts_c"] = live_markouts(data / a["name"] / "fills.jsonl")
+        a["ladder"] = ladder_of(a["name"])
     daily_path = data / "daily.jsonl"
     today = day or datetime.now().date().isoformat()
     rows = [json.loads(x) for x in daily_path.read_text().splitlines()] if daily_path.exists() else []
@@ -196,7 +246,8 @@ def build(data: Path, client, with_markouts: bool = True, day: str | None = None
         "unit": "day", "min_units_for_verdict": MIN_DAYS,
         "status": "verdict" if n_days >= MIN_DAYS else "collecting",
         "headline": headline(n_days, arms, comps),
-        "arms": arms, "comparisons": comps, "daily": daily, "kill_criteria": KILL, "caveats": CAVEATS,
+        "arms": arms, "comparisons": comps, "daily": daily, "latency_curve": latency_curve(arms),
+        "kill_criteria": KILL, "caveats": CAVEATS,
     }
 
 

@@ -87,6 +87,13 @@ What v2 changes, each aimed at a measured v1 loss:
   price, 0.5s ack/cancel latency, whole-contract fills off real prints. This
   biases the comparison *against* v2.
 
+**Latency ladder (since 2026-09-28).** `crypto_ladder` and `niche_ladder` each run one
+process with five arms (`v2_<kind>_<ms>ms`, 0/125/250/375/500ms paper order latency)
+sharing one feed, universe and fair value, re-quoting on a faster step (0.1s crypto,
+0.5s niche) so the rungs differ only in latency. Arms in one process that differ in
+anything else are refused at startup. The report's `latency_curve` gives PnL, realized
+per resolved contract, passive vs settled per contract, and the 60s live markout per rung.
+
 Scoring is `scripts/ab_report.py`: per-arm PnL net of fees, exits split by path
 (passive / crossed / settled), realized cents per resolved contract, 5m/60m
 markouts from Kalshi candles computed identically for every arm, and a paired
