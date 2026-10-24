@@ -23,7 +23,7 @@ import random
 import sys
 import time
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
@@ -32,6 +32,7 @@ from pmm.config import Config
 from pmm.kalshi.client import KalshiClient
 from pmm.trader.position import Fill, MarketPosition, load_portfolio
 
+DOWNTIME = Path.home() / "personal" / "automation" / "downtime.json"
 MIN_DAYS = 14
 MIN_CONTRACTS = 200
 BOOT = 2000
@@ -58,7 +59,8 @@ CAVEATS = [
     "waits 0.5s for acks and cancels; v1 queues behind the top of book and fills instantly. "
     "That bias works against v2.",
     "v1 marks open inventory at the last mid it saw; v2 holds to resolution and settles at 0 or 100.",
-    "Days lost to the laptop sleeping are lost for every arm at once.",
+    "Days lost to the laptop sleeping are lost for every arm at once, and are excluded from the "
+    "per-day statistics rather than scored as zero (automation/downtime.json).",
 ]
 
 
@@ -206,6 +208,19 @@ def latency_curve(arms: list[dict]) -> list[dict]:
     return out
 
 
+def down_dates() -> set[str]:
+    """Days the laptop was shut: every arm sat idle, so they are not paired units of evidence."""
+    if not DOWNTIME.exists():
+        return set()
+    out = set()
+    for w in json.loads(DOWNTIME.read_text()).get("windows") or []:
+        d, end = datetime.fromisoformat(w["start"]).date(), datetime.fromisoformat(w["end"]).date()
+        while d <= end:
+            out.add(d.isoformat())
+            d += timedelta(days=1)
+    return out
+
+
 def build(data: Path, client, with_markouts: bool = True, day: str | None = None) -> dict:
     # Candle markouts cost one request per market, so only the three original arms pay
     # for them; every v2 arm (ladder included) also carries its own live markouts.
@@ -218,7 +233,9 @@ def build(data: Path, client, with_markouts: bool = True, day: str | None = None
     rows = [json.loads(x) for x in daily_path.read_text().splitlines()] if daily_path.exists() else []
     rows = [r for r in rows if r["date"] != today] + [{"date": today, **{a["name"]: a["pnl"] for a in arms}}]
     daily_path.write_text("".join(json.dumps(r) + "\n" for r in rows))
-    deltas = {a: [(r1[a] - r0[a]) for r0, r1 in zip(rows, rows[1:]) if a in r0 and a in r1] for a in ARMS}
+    down = down_dates()
+    deltas = {a: [(r1[a] - r0[a]) for r0, r1 in zip(rows, rows[1:])
+                  if a in r0 and a in r1 and r1["date"] not in down] for a in ARMS}
     for a in arms:
         d = deltas[a["name"]]
         a["units"] = len(d)
@@ -233,11 +250,12 @@ def build(data: Path, client, with_markouts: bool = True, day: str | None = None
                    "better" if ci[0] > 0 else "worse" if ci[1] < 0 else "indistinguishable")
         comps.append({"treatment": t, "control": "baseline", "metric": "pnl_per_day",
                       "diff": round(sum(diff) / n, 3) if n else None, "ci": ci, "verdict": verdict})
-    n_days = len(rows) - 1
+    n_days = sum(1 for r in rows[1:] if r["date"] not in down)
     daily, prev = [], {}
     for r in rows:
         daily.append({"date": r["date"], "pnl": {a: round(r[a] - prev.get(a, 0.0), 2) for a in ARMS if a in r},
-                      "units": {a: 1 for a in ARMS if a in r}})
+                      "units": {a: 0 if r["date"] in down else 1 for a in ARMS if a in r},
+                      **({"excluded": "downtime"} if r["date"] in down else {})})
         prev = r
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(),
