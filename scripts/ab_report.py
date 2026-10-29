@@ -116,7 +116,7 @@ def score_arm(name: str, pf_path: Path, client, with_markouts: bool) -> dict:
     closed_contracts = 0
     per_market: list[float] = []
     fills = contracts = 0
-    fees = mtm = 0.0
+    fees = mtm = maker_notional = 0.0
     mk = defaultdict(list)
     for t, pos in pf.positions.items():
         replay = MarketPosition(ticker=t, subsector=pos.subsector)
@@ -126,6 +126,8 @@ def score_arm(name: str, pf_path: Path, client, with_markouts: bool) -> dict:
             if f.order_id != "SETTLE":
                 fills += 1
                 contracts += f.count
+                if not f.is_taker:
+                    maker_notional += f.count * f.price_dollars
             fees += f.fee_dollars
             reducing = prev != 0 and (prev > 0) != (replay.yes_contracts - prev > 0)
             if reducing:
@@ -158,6 +160,10 @@ def score_arm(name: str, pf_path: Path, client, with_markouts: bool) -> dict:
         "fills": fills, "size": contracts, "markets": len(pf.positions),
         "pnl": round(total, 2), "realized": round(realized, 2), "mtm": round(mtm, 2), "fees": round(fees, 2),
         "pnl_per_size_c": round(100 * total / contracts, 3) if contracts else None,
+        # Analysis only, nothing trades on it: the maker rebate, in bps of the notional this
+        # arm filled passively, that would bring it to zero. Negative = already profitable.
+        "maker_notional": round(maker_notional, 2),
+        "breakeven_rebate_bps": round(-1e4 * total / maker_notional, 1) if maker_notional else None,
         "resolved_contracts": closed_contracts,
         "realized_per_resolved_c": round(100 * sum(v[1] for v in by_exit.values()) / closed_contracts, 3)
         if closed_contracts else None,
