@@ -33,6 +33,11 @@ class EdgeParams:
     quiet_mult: float = 1.5     # widen the base in QUIET windows
     band_lo_c: int = 15         # never ADD outside this band; reducing may go anywhere
     band_hi_c: int = 85
+    # Aggro close: whatever the position, rest all of it at the touch on the reducing
+    # side -- join the best ask to sell, the best bid to buy -- whatever the edge curve
+    # says, and keep it there through every gate that only needs fair value. Still never
+    # crosses, so still never pays a taker fee. A variant arm, not a change to v2.
+    aggro_close: bool = False
 
     def check(self):
         if self.order_size <= 0 or self.q_max < self.order_size:
@@ -58,6 +63,17 @@ def required_edge(q_side: float, sigma_c: float, days: float, mode: str, p: Edge
     base = p.k_base_c * (p.quiet_mult if mode == QUIET else 1.0)
     x = max(-1.0, min(1.0, q_side))
     return base + p.k_vol * sigma_c + p.k_day_c * max(days, 0.0) + p.k_skew_c * x
+
+
+def close_quote(position: int, best_bid: int, best_ask: int, fv_c: float | None = None) -> Quote | None:
+    """The aggro close: the whole position, joined at the touch on the reducing side."""
+    if not position or best_bid is None or best_ask is None or best_bid >= best_ask:
+        return None
+    side, price, s = ("sell", best_ask, -1) if position > 0 else ("buy", best_bid, 1)
+    if not 1 <= price <= 99:
+        return None
+    ref = fv_c if fv_c is not None else (best_bid + best_ask) / 2.0
+    return Quote(side, price, abs(position), "join", s * (ref - price))
 
 
 def desired_quotes(fv_c: float, sigma_c: float, position: int, q_eff: float,
@@ -95,4 +111,8 @@ def desired_quotes(fv_c: float, sigma_c: float, position: int, q_eff: float,
         touch = best_bid if side == "buy" else best_ask
         tactic = "join" if price == touch else ("improve" if s * (price - touch) > 0 else "rest")
         out.append(Quote(side, price, size, tactic, s * (fv_c - price)))
+    if p.aggro_close and position:
+        close = close_quote(position, best_bid, best_ask, fv_c)
+        i = 1 if position > 0 else 0
+        out[i] = close
     return out[0], out[1]

@@ -38,7 +38,7 @@ from pmm.trader.schedule import compute_window
 from pmm.trader.subsector_tuning import get as get_tuning, is_in_blackout
 from pmm.trader.universe import discover_markets
 from pmm.v2.fairvalue import Anchor, BinanceSpot, EWVar, SpotVol, p_above, prob_sigma_c, twap_t_eff
-from pmm.v2.quote import QUIET, REDUCE_ONLY, TWO_SIDED, EdgeParams, desired_quotes
+from pmm.v2.quote import QUIET, REDUCE_ONLY, TWO_SIDED, EdgeParams, close_quote, desired_quotes
 from pmm.v2.stream import KalshiStream, Print
 from pmm.v2.venue import PaperVenue
 
@@ -71,10 +71,12 @@ class ArmConfig:
     latency_s: float = 0.5               # paper order ack and cancel latency
 
 
-NICHE = ArmConfig("v2_niche", "niche", EdgeParams(), step_s=2.0, universe_refresh_s=900.0)
+# Phase 2 (from 2026-10-30): every v2 arm, ladders included, carries the aggro close
+# (quote.close_quote). Phase 1, without it, is archived under archive/phase1/.
+NICHE = ArmConfig("v2_niche", "niche", EdgeParams(aggro_close=True), step_s=2.0, universe_refresh_s=900.0)
 CRYPTO = ArmConfig("v2_crypto", "crypto",
                    EdgeParams(order_size=3, q_max=10, k_base_c=1.0, k_vol=1.0, k_skew_c=2.0,
-                              band_lo_c=8, band_hi_c=92),
+                              band_lo_c=8, band_hi_c=92, aggro_close=True),
                    step_s=0.5, universe_refresh_s=300.0)
 
 # Latency ladders: the same strategy at five order latencies from instant to the
@@ -132,10 +134,13 @@ class Engine:
         cfgs = (cfgs,) if isinstance(cfgs, ArmConfig) else tuple(cfgs)
         base = cfgs[0]
         # Arms in one process share the feed, the universe and the fair value, so they
-        # may differ in nothing but name and latency. Anything else is a config error.
+        # may differ in nothing but name, latency and the per-arm aggro-close rule.
+        # Anything else is a config error.
         for c in cfgs[1:]:
-            if replace(c, name=base.name, latency_s=base.latency_s) != base:
-                raise ValueError(f"{c.name} differs from {base.name} in more than latency")
+            same = replace(c, name=base.name, latency_s=base.latency_s,
+                           edge=replace(c.edge, aggro_close=base.edge.aggro_close))
+            if same != base:
+                raise ValueError(f"{c.name} differs from {base.name} in more than latency and aggro close")
         self.cfg, self.client, self.series_df = base, client, series_df
         self.arms = [Arm(c, data_root / c.name) for c in cfgs]
         self.fee_book = FeeBook.from_series_frame(series_df)
@@ -278,6 +283,11 @@ class Engine:
         bid, ask = desired_quotes(fv, sigma, pos.yes_contracts, q, book.best_bid, book.best_ask,
                                   days, mode, cfg.edge)
         arm.gates["quoting_" + mode] += 1
+        self._reconcile(arm, m, pos.yes_contracts, bid, ask, fv, now, side_block)
+
+    def _reconcile(self, arm: Arm, m: Mkt, position: int, bid, ask, fv: float, now: float,
+                   side_block: set[str] = frozenset()):
+        cfg = arm.cfg
         for side, qt in (("buy", bid), ("sell", ask)):
             w = arm.venue.working(m.ticker, side)
             if qt is None or side in side_block:
@@ -290,23 +300,33 @@ class Engine:
                     arm.venue.cancel(now, w.oid)
                 continue
             s = 1 if side == "buy" else -1
-            adds = s * pos.yes_contracts >= 0
+            adds = s * position >= 0
             inflight = arm.venue.pending(m.ticker, side)
-            if adds and s * pos.yes_contracts + inflight + qt.size > cfg.edge.q_max:
+            if adds and s * position + inflight + qt.size > cfg.edge.q_max:
                 continue
-            if not adds and inflight + qt.size > abs(pos.yes_contracts):
+            if not adds and inflight + qt.size > abs(position):
                 continue
             arm.venue.place(now, m.ticker, side, qt.price_c, qt.size, qt.tactic, fv)
 
-    def _pull(self, m: Mkt, now: float, gate: str):
+    def _pull(self, m: Mkt, now: float, gate: str, book=None):
+        """Cancel every arm's orders on this market -- except an aggro-close arm's close,
+        which needs only a two-sided book and an open market, not a fair value."""
+        live = book is not None and book.mid_c is not None and datetime.now(timezone.utc) < m.close_time
         for arm in self.arms:
-            arm.venue.cancel_ticker(now, m.ticker)
             arm.gates[gate] += 1
+            pos = arm.portfolio.positions.get(m.ticker)
+            if live and arm.cfg.edge.aggro_close and pos is not None and pos.yes_contracts:
+                close = close_quote(pos.yes_contracts, book.best_bid, book.best_ask)
+                bid, ask = (close, None) if pos.yes_contracts < 0 else (None, close)
+                self._reconcile(arm, m, pos.yes_contracts, bid, ask, book.mid_c, now)
+                arm.gates["aggro_close_" + gate] += 1
+                continue
+            arm.venue.cancel_ticker(now, m.ticker)
 
     def _step_market(self, m: Mkt, now: float, now_dt: datetime, deltas: dict[str, dict[str, float]]):
-        if self._pulled(m, now_dt):
-            return self._pull(m, now, PULLED)
         book = self.stream.books.get(m.ticker)
+        if self._pulled(m, now_dt):
+            return self._pull(m, now, PULLED, book)
         if book is None or book.mid_c is None:
             return self._pull(m, now, "no_book" if book is None else "book_one_sided")
         for arm in self.arms:          # mark-to-mid even while a gate keeps the market quiet
@@ -315,7 +335,7 @@ class Engine:
                 p.last_mid_dollars = book.mid_c / 100.0
         blocked, fv, sigma = self._fair(m, book, now)
         if blocked:
-            return self._pull(m, now, blocked)
+            return self._pull(m, now, blocked, book)
         for arm in self.arms:
             self._quote(arm, m, book, fv, sigma, now, now_dt, deltas[arm.cfg.name])
 

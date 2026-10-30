@@ -33,6 +33,14 @@ from pmm.kalshi.client import KalshiClient
 from pmm.trader.position import Fill, MarketPosition, load_portfolio
 
 DOWNTIME = Path.home() / "personal" / "automation" / "downtime.json"
+PHASE = 2
+PHASE_STARTED = "2026-10-30"
+PHASES = [{"phase": 1, "started": "2026-09-25", "ended": "2026-10-29",
+           "change": "v2 rested its reducing side only where the edge curve allowed; positions could sit "
+                     "off the touch and were held to resolution.",
+           "archive": "prediction-mm/archive/phase1/",
+           "result": "No verdict: 10 of the 14 clean days needed. Running totals v1 -$25.28, v2_niche -$12.24, "
+                     "v2_crypto -$44.32; v2 would have broken even at a 28bp (niche) / 41bp (crypto) maker rebate."}]
 MIN_DAYS = 14
 MIN_CONTRACTS = 200
 BOOT = 2000
@@ -49,16 +57,22 @@ for _k in ("crypto", "niche"):
     for _ms in LADDER_MS:
         ARMS[f"v2_{_k}_{_ms}ms"] = ("treatment", f"v2_{_k} at {_ms}ms order latency on a faster re-quote step "
                                                  "(latency ladder).")
+AGGRO_NOTE = (" Phase 2: any position also rests in full at the touch on the closing side at all "
+              "times (aggro close), never crossing.")
+ARMS = {k: (r, d + AGGRO_NOTE) if k.startswith("v2_") else (r, d) for k, (r, d) in ARMS.items()}
 KILL = [f"A treatment whose realized expectancy per resolved contract is negative after {MIN_CONTRACTS} "
         "contracts is stopped.",
         "Any aggregate exposure breach, or a position held into a resolution rule nobody read, stops "
         "that arm until fixed.",
-        "Written before the first v2 paper fill (2026-09-25); not moved after seeing results."]
+        "Written before the first v2 paper fill (2026-09-25), carried unchanged into phase 2 (2026-10-30); "
+        "not moved after seeing results."]
 CAVEATS = [
     "Paper fills. v2's venue is stricter than v1's: v2 queues behind the size at its own price and "
     "waits 0.5s for acks and cancels; v1 queues behind the top of book and fills instantly. "
     "That bias works against v2.",
     "v1 marks open inventory at the last mid it saw; v2 holds to resolution and settles at 0 or 100.",
+    "Phase 2 started every arm from flat on 2026-10-30, v2 with the aggro close and v1 unchanged; "
+    "phase 1's full record is archived in the repo (archive/phase1/) and is not mixed into these numbers.",
     "Days lost to the laptop sleeping are lost for every arm at once, and are excluded from the "
     "per-day statistics rather than scored as zero (automation/downtime.json).",
 ]
@@ -206,6 +220,7 @@ def latency_curve(arms: list[dict]) -> list[dict]:
             a = by[f"{strat}_{ms}ms"]
             ex = a["exits"]
             rungs.append({"latency_ms": ms, "arm": a["name"], "fills": a["fills"], "pnl": a["pnl"],
+                          "breakeven_rebate_bps": a.get("breakeven_rebate_bps"),
                           "realized_per_resolved_c": a["realized_per_resolved_c"],
                           "passive_per_contract_c": (ex.get("passive") or {}).get("per_contract_c"),
                           "settled_per_contract_c": (ex.get("settled") or {}).get("per_contract_c"),
@@ -266,7 +281,8 @@ def build(data: Path, client, with_markouts: bool = True, day: str | None = None
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "experiment": "Kalshi market making: v1 against the v2 engine",
-        "venue": "Kalshi", "paper": True, "started": "2026-09-25",
+        "venue": "Kalshi", "paper": True, "started": PHASE_STARTED,
+        "phase": PHASE, "previous_phases": PHASES,
         "unit": "day", "min_units_for_verdict": MIN_DAYS,
         "status": "verdict" if n_days >= MIN_DAYS else "collecting",
         "headline": headline(n_days, arms, comps),

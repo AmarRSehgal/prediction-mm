@@ -4,7 +4,7 @@ import math
 import pytest
 
 from pmm.v2.fairvalue import Anchor, p_above, prob_sigma_c, twap_t_eff
-from pmm.v2.quote import QUIET, REDUCE_ONLY, TWO_SIDED, EdgeParams, desired_quotes, required_edge
+from pmm.v2.quote import QUIET, REDUCE_ONLY, TWO_SIDED, EdgeParams, close_quote, desired_quotes, required_edge
 from pmm.v2.stream import KalshiBook, Print
 from pmm.v2.venue import PaperVenue
 
@@ -178,3 +178,49 @@ def test_one_print_fills_the_fast_rung_not_the_slow_one(tmp_path):
     fast, slow = e.arms
     assert fast.portfolio.positions[t].yes_contracts == -3
     assert t not in slow.portfolio.positions
+
+
+AGGRO = EdgeParams(aggro_close=True)
+
+
+def test_aggro_close_joins_the_touch_with_the_whole_position():
+    """A small long the edge curve would rest off the touch is offered at the best ask, all of it."""
+    plain_bid, _ = desired_quotes(50.0, 0.0, 1, 0.2, 45, 55, 1.0, TWO_SIDED, P)
+    bid, ask = desired_quotes(50.0, 0.0, 1, 0.2, 45, 55, 1.0, TWO_SIDED, AGGRO)
+    assert (ask.side, ask.price_c, ask.size, ask.tactic) == ("sell", 55, 1, "join")
+    assert bid == plain_bid                                                  # adding side unchanged
+    bid, ask = desired_quotes(50.0, 0.0, -3, -0.6, 45, 55, 1.0, REDUCE_ONLY, AGGRO)
+    assert (bid.side, bid.price_c, bid.size) == ("buy", 45, 3) and ask is None
+
+
+def test_aggro_close_never_crosses_and_is_off_when_flat():
+    assert close_quote(0, 45, 55) is None
+    assert close_quote(2, 55, 55) is None                                    # locked book: nothing to join
+    q = close_quote(2, 45, 55)
+    assert q.price_c == 55 and q.side == "sell"                              # the ask, never the bid
+
+
+def test_aggro_arm_keeps_its_close_through_a_fair_value_gate(tmp_path):
+    from datetime import datetime, timedelta, timezone
+    from pmm.trader.position import Fill
+    from dataclasses import replace
+    from pmm.v2.engine import NICHE, Mkt
+    plain_cfg = replace(NICHE, name="v2_niche_plain", edge=replace(NICHE.edge, aggro_close=False))
+    e = _engine(tmp_path, (plain_cfg, NICHE))
+    t = "KXX-E-T1"
+    e.mkts[t] = Mkt(t, "weather", "KXX", "KXX-E", datetime.now(timezone.utc) + timedelta(days=2))
+    e.stream.books[t] = book(yes=((40, 10.0),), no=((50, 10.0),))         # bid 40, ask 50
+    for arm in e.arms:
+        arm.portfolio.position(t, "weather").add_fill(
+            Fill(ts="2026-10-29T00:00:00Z", ticker=t, side="yes", action="buy", count=2,
+                 price_dollars=0.42, fee_dollars=0.0, order_id="o1"))
+    e._pull(e.mkts[t], 0.0, "fv_gap", e.stream.books[t])
+    plain, aggro = e.arms
+    assert plain.venue.working(t, "sell") is None
+    w = aggro.venue.working(t, "sell")
+    assert w is not None and (w.price_c, w.size) == (50, 2)
+
+
+def test_phase2_arms_all_carry_the_aggro_close():
+    from pmm.v2.engine import CRYPTO, CRYPTO_LADDER, NICHE, NICHE_LADDER
+    assert all(a.edge.aggro_close for a in (NICHE, CRYPTO, *NICHE_LADDER, *CRYPTO_LADDER))

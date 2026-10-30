@@ -58,7 +58,10 @@ has three defects that explain why (all pinned by `test_KNOWN_BUG_*` tests):
 There is also **no fee model anywhere in the repo**. Kalshi's fee is material
 relative to a 1-3c capture, so every PnL number above is optimistic.
 
-## Paper A/B: v1 against v2 (running since 2026-09-25)
+## Paper A/B: v1 against v2 (running since 2026-09-25; phase 2 since 2026-10-30)
+
+**Phase 2 from 2026-10-30.** Every v2 arm, ladders included, now carries an *aggro close*: whatever the position, all of it rests at the touch on the closing side (join the best ask to sell, the best bid to buy), kept through the fair-value gates, never crossing. All arms restarted from flat. Phase 1 (2026-09-25..10-29, no aggro close) is archived with its raw record and final report in `archive/phase1/`; its README says how to re-score it. Each report also gives every maker arm's break-even maker rebate in bps of notional.
+
 
 The quoter fixes and fee model above were scored only against the recorded
 April tape. To find out whether the code is actually better, three arms now run
