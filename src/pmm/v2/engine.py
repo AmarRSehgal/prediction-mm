@@ -38,7 +38,7 @@ from pmm.trader.schedule import compute_window
 from pmm.trader.subsector_tuning import get as get_tuning, is_in_blackout
 from pmm.trader.universe import discover_markets
 from pmm.v2.fairvalue import Anchor, BinanceSpot, EWVar, SpotVol, p_above, prob_sigma_c, twap_t_eff
-from pmm.v2.quote import QUIET, REDUCE_ONLY, TWO_SIDED, EdgeParams, close_quote, desired_quotes
+from pmm.v2.quote import QUIET, REDUCE_ONLY, TWO_SIDED, UNWIND, EdgeParams, close_quote, desired_quotes
 from pmm.v2.stream import KalshiStream, Print
 from pmm.v2.venue import PaperVenue
 
@@ -69,15 +69,20 @@ class ArmConfig:
     strikes_per_expiry: int = 10
     expiries_per_asset: int = 3
     latency_s: float = 0.5               # paper order ack and cancel latency
+    # Phase 3: quote normally; reduce-only once the time to close is under unwind_multiple x
+    # the time to trade the position at adv_participation of the market's 24h volume; in the
+    # last unwind_s, rest whatever is left at the touch to close (quote.UNWIND).
+    unwind_s: float = 7200.0
+    adv_participation: float = 0.10
+    unwind_multiple: float = 5.0
 
 
-# Phase 2 (from 2026-10-30): every v2 arm, ladders included, carries the aggro close
-# (quote.close_quote). Phase 1, without it, is archived under archive/phase1/.
-NICHE = ArmConfig("v2_niche", "niche", EdgeParams(aggro_close=True), step_s=2.0, universe_refresh_s=900.0)
+# Phase 3 (from 2026-11-03): every v2 arm, ladders included. Phases 1-2 are under archive/.
+NICHE = ArmConfig("v2_niche", "niche", EdgeParams(), step_s=2.0, universe_refresh_s=900.0)
 CRYPTO = ArmConfig("v2_crypto", "crypto",
                    EdgeParams(order_size=3, q_max=10, k_base_c=1.0, k_vol=1.0, k_skew_c=2.0,
-                              band_lo_c=8, band_hi_c=92, aggro_close=True),
-                   step_s=0.5, universe_refresh_s=300.0)
+                              band_lo_c=8, band_hi_c=92),
+                   step_s=0.5, universe_refresh_s=300.0, unwind_s=900.0)   # hourly markets
 
 # Latency ladders: the same strategy at five order latencies from instant to the
 # existing arms' 0.5s, all on a faster step so the rungs differ only in latency.
@@ -97,6 +102,7 @@ class Mkt:
     close_time: datetime
     strike: float = 0.0
     symbol: str = ""
+    vol_24h: float = 0.0          # contracts, from the universe refresh; drives the phase-3 unwind
     anchor: Anchor = field(default_factory=Anchor)
     fv_var: EWVar = field(default_factory=lambda: EWVar(1800.0, 1.0))
     last_var_t: float = 0.0
@@ -134,13 +140,10 @@ class Engine:
         cfgs = (cfgs,) if isinstance(cfgs, ArmConfig) else tuple(cfgs)
         base = cfgs[0]
         # Arms in one process share the feed, the universe and the fair value, so they
-        # may differ in nothing but name, latency and the per-arm aggro-close rule.
-        # Anything else is a config error.
+        # may differ in nothing but name and latency. Anything else is a config error.
         for c in cfgs[1:]:
-            same = replace(c, name=base.name, latency_s=base.latency_s,
-                           edge=replace(c.edge, aggro_close=base.edge.aggro_close))
-            if same != base:
-                raise ValueError(f"{c.name} differs from {base.name} in more than latency and aggro close")
+            if replace(c, name=base.name, latency_s=base.latency_s) != base:
+                raise ValueError(f"{c.name} differs from {base.name} in more than latency")
         self.cfg, self.client, self.series_df = base, client, series_df
         self.arms = [Arm(c, data_root / c.name) for c in cfgs]
         self.fee_book = FeeBook.from_series_frame(series_df)
@@ -154,7 +157,8 @@ class Engine:
     def _discover_niche(self) -> list[Mkt]:
         out = []
         for m in discover_markets(self.client, TARGET_SUBSECTORS, self.series_df):
-            out.append(Mkt(m.ticker, m.subsector, m.series, m.ticker.rsplit("-", 1)[0], m.close_time))
+            out.append(Mkt(m.ticker, m.subsector, m.series, m.ticker.rsplit("-", 1)[0], m.close_time,
+                           vol_24h=m.vol_24h))
         return out
 
     def _discover_crypto(self) -> list[Mkt]:
@@ -178,7 +182,8 @@ class Engine:
                 near = sorted(by_exp[exp], key=lambda m: abs(float(m["floor_strike"]) - spot))
                 for m in near[: self.cfg.strikes_per_expiry]:
                     out.append(Mkt(m["ticker"], "crypto_" + sym[:3].lower(), series, m["event_ticker"],
-                                   _dt(m["close_time"]), strike=float(m["floor_strike"]), symbol=sym))
+                                   _dt(m["close_time"]), strike=float(m["floor_strike"]), symbol=sym,
+                                   vol_24h=float(m.get("volume_24h_fp") or m.get("volume_24h") or 0)))
         return out
 
     async def _universe(self):
@@ -188,6 +193,8 @@ class Engine:
                 found = await asyncio.to_thread(fn)
                 keep = {t: m for t, m in self.mkts.items() if any(a.held(t) for a in self.arms)}
                 fresh = {m.ticker: self.mkts.get(m.ticker, m) for m in found}
+                for m in found:                  # kept objects hold state; refresh their volume
+                    fresh[m.ticker].vol_24h = m.vol_24h
                 self.mkts = {**fresh, **keep}
                 self.stream.set_tickers(self.mkts)
                 log.info("universe: %d markets (%d held outside it)", len(self.mkts), len(keep.keys() - fresh.keys()))
@@ -279,6 +286,7 @@ class Engine:
                         if t.rsplit("-", 1)[0] == m.event)
             if gross >= cfg.event_gross_cap:
                 mode = REDUCE_ONLY
+        mode = self._phase3(arm, m, pos.yes_contracts, now_dt) or mode
         days = (m.close_time - now_dt).total_seconds() / 86400
         bid, ask = desired_quotes(fv, sigma, pos.yes_contracts, q, book.best_bid, book.best_ask,
                                   days, mode, cfg.edge)
@@ -308,18 +316,32 @@ class Engine:
                 continue
             arm.venue.place(now, m.ticker, side, qt.price_c, qt.size, qt.tactic, fv)
 
+    def _phase3(self, arm: Arm, m: Mkt, position: int, now_dt: datetime) -> str | None:
+        """UNWIND in the last unwind_s; REDUCE_ONLY once the position could not be traded out
+        in time at adv_participation of 24h volume (unwind_multiple times over); else None."""
+        cfg = arm.cfg
+        left = (m.close_time - now_dt).total_seconds()
+        if left < cfg.unwind_s:
+            return UNWIND
+        rate = m.vol_24h / 86400.0
+        if position and (rate <= 0 or left < cfg.unwind_multiple * abs(position) / (cfg.adv_participation * rate)):
+            return REDUCE_ONLY
+        return None
+
     def _pull(self, m: Mkt, now: float, gate: str, book=None):
-        """Cancel every arm's orders on this market -- except an aggro-close arm's close,
-        which needs only a two-sided book and an open market, not a fair value."""
-        live = book is not None and book.mid_c is not None and datetime.now(timezone.utc) < m.close_time
+        """Cancel every arm's orders on this market -- except a phase-3 unwind, which needs
+        only a two-sided book and an open market, not a fair value."""
+        now_dt = datetime.now(timezone.utc)
+        live = book is not None and book.mid_c is not None and now_dt < m.close_time
         for arm in self.arms:
             arm.gates[gate] += 1
             pos = arm.portfolio.positions.get(m.ticker)
-            if live and arm.cfg.edge.aggro_close and pos is not None and pos.yes_contracts:
+            if (live and pos is not None and pos.yes_contracts
+                    and self._phase3(arm, m, pos.yes_contracts, now_dt) == UNWIND):
                 close = close_quote(pos.yes_contracts, book.best_bid, book.best_ask)
                 bid, ask = (close, None) if pos.yes_contracts < 0 else (None, close)
                 self._reconcile(arm, m, pos.yes_contracts, bid, ask, book.mid_c, now)
-                arm.gates["aggro_close_" + gate] += 1
+                arm.gates["unwind_" + gate] += 1
                 continue
             arm.venue.cancel_ticker(now, m.ticker)
 

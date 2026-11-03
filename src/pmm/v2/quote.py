@@ -20,6 +20,8 @@ import math
 from dataclasses import dataclass
 
 TWO_SIDED, QUIET, REDUCE_ONLY = "two_sided", "quiet", "reduce_only"
+# Phase 3: the end-of-market unwind -- nothing added, the whole position joined at the touch.
+UNWIND = "unwind"
 
 
 @dataclass(frozen=True)
@@ -33,11 +35,6 @@ class EdgeParams:
     quiet_mult: float = 1.5     # widen the base in QUIET windows
     band_lo_c: int = 15         # never ADD outside this band; reducing may go anywhere
     band_hi_c: int = 85
-    # Aggro close: whatever the position, rest all of it at the touch on the reducing
-    # side -- join the best ask to sell, the best bid to buy -- whatever the edge curve
-    # says, and keep it there through every gate that only needs fair value. Still never
-    # crosses, so still never pays a taker fee. A variant arm, not a change to v2.
-    aggro_close: bool = False
 
     def check(self):
         if self.order_size <= 0 or self.q_max < self.order_size:
@@ -66,7 +63,7 @@ def required_edge(q_side: float, sigma_c: float, days: float, mode: str, p: Edge
 
 
 def close_quote(position: int, best_bid: int, best_ask: int, fv_c: float | None = None) -> Quote | None:
-    """The aggro close: the whole position, joined at the touch on the reducing side."""
+    """The unwind close: the whole position, joined at the touch on the reducing side."""
     if not position or best_bid is None or best_ask is None or best_bid >= best_ask:
         return None
     side, price, s = ("sell", best_ask, -1) if position > 0 else ("buy", best_bid, 1)
@@ -87,6 +84,9 @@ def desired_quotes(fv_c: float, sigma_c: float, position: int, q_eff: float,
     one tick takes first place in the queue without giving away more edge than
     the curve asked for.
     """
+    if mode == UNWIND:
+        close = close_quote(position, best_bid, best_ask, fv_c)
+        return (close, None) if position < 0 else (None, close)
     out: list[Quote | None] = []
     size_scale = 0.5 if mode == QUIET else 1.0
     for side, s in (("buy", 1), ("sell", -1)):
@@ -111,8 +111,4 @@ def desired_quotes(fv_c: float, sigma_c: float, position: int, q_eff: float,
         touch = best_bid if side == "buy" else best_ask
         tactic = "join" if price == touch else ("improve" if s * (price - touch) > 0 else "rest")
         out.append(Quote(side, price, size, tactic, s * (fv_c - price)))
-    if p.aggro_close and position:
-        close = close_quote(position, best_bid, best_ask, fv_c)
-        i = 1 if position > 0 else 0
-        out[i] = close
     return out[0], out[1]

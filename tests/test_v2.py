@@ -4,7 +4,7 @@ import math
 import pytest
 
 from pmm.v2.fairvalue import Anchor, p_above, prob_sigma_c, twap_t_eff
-from pmm.v2.quote import QUIET, REDUCE_ONLY, TWO_SIDED, EdgeParams, close_quote, desired_quotes, required_edge
+from pmm.v2.quote import QUIET, REDUCE_ONLY, TWO_SIDED, UNWIND, EdgeParams, close_quote, desired_quotes, required_edge
 from pmm.v2.stream import KalshiBook, Print
 from pmm.v2.venue import PaperVenue
 
@@ -180,47 +180,59 @@ def test_one_print_fills_the_fast_rung_not_the_slow_one(tmp_path):
     assert t not in slow.portfolio.positions
 
 
-AGGRO = EdgeParams(aggro_close=True)
 
-
-def test_aggro_close_joins_the_touch_with_the_whole_position():
-    """A small long the edge curve would rest off the touch is offered at the best ask, all of it."""
-    plain_bid, _ = desired_quotes(50.0, 0.0, 1, 0.2, 45, 55, 1.0, TWO_SIDED, P)
-    bid, ask = desired_quotes(50.0, 0.0, 1, 0.2, 45, 55, 1.0, TWO_SIDED, AGGRO)
-    assert (ask.side, ask.price_c, ask.size, ask.tactic) == ("sell", 55, 1, "join")
-    assert bid == plain_bid                                                  # adding side unchanged
-    bid, ask = desired_quotes(50.0, 0.0, -3, -0.6, 45, 55, 1.0, REDUCE_ONLY, AGGRO)
+def test_unwind_joins_the_touch_with_the_whole_position_and_adds_nothing():
+    bid, ask = desired_quotes(50.0, 0.0, 1, 0.2, 45, 55, 1.0, UNWIND, P)
+    assert bid is None and (ask.side, ask.price_c, ask.size, ask.tactic) == ("sell", 55, 1, "join")
+    bid, ask = desired_quotes(50.0, 0.0, -3, -0.6, 45, 55, 1.0, UNWIND, P)
     assert (bid.side, bid.price_c, bid.size) == ("buy", 45, 3) and ask is None
+    assert desired_quotes(50.0, 0.0, 0, 0.0, 45, 55, 1.0, UNWIND, P) == (None, None)
 
 
-def test_aggro_close_never_crosses_and_is_off_when_flat():
+def test_close_never_crosses_and_is_off_when_flat():
     assert close_quote(0, 45, 55) is None
     assert close_quote(2, 55, 55) is None                                    # locked book: nothing to join
     q = close_quote(2, 45, 55)
     assert q.price_c == 55 and q.side == "sell"                              # the ask, never the bid
 
 
-def test_aggro_arm_keeps_its_close_through_a_fair_value_gate(tmp_path):
+def _phase3_engine(tmp_path, hours_to_close, vol_24h):
     from datetime import datetime, timedelta, timezone
-    from pmm.trader.position import Fill
-    from dataclasses import replace
     from pmm.v2.engine import NICHE, Mkt
-    plain_cfg = replace(NICHE, name="v2_niche_plain", edge=replace(NICHE.edge, aggro_close=False))
-    e = _engine(tmp_path, (plain_cfg, NICHE))
+    e = _engine(tmp_path, (NICHE,))
     t = "KXX-E-T1"
-    e.mkts[t] = Mkt(t, "weather", "KXX", "KXX-E", datetime.now(timezone.utc) + timedelta(days=2))
-    e.stream.books[t] = book(yes=((40, 10.0),), no=((50, 10.0),))         # bid 40, ask 50
-    for arm in e.arms:
-        arm.portfolio.position(t, "weather").add_fill(
-            Fill(ts="2026-10-29T00:00:00Z", ticker=t, side="yes", action="buy", count=2,
+    e.mkts[t] = Mkt(t, "weather", "KXX", "KXX-E", datetime.now(timezone.utc) + timedelta(hours=hours_to_close),
+                    vol_24h=vol_24h)
+    return e, e.arms[0], e.mkts[t]
+
+
+def test_phase3_modes_follow_time_to_close_and_volume(tmp_path):
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc)
+    e, arm, m = _phase3_engine(tmp_path, 48, 864.0)       # 0.01 contracts/s
+    assert e._phase3(arm, m, 0, now) is None                # flat: quote normally until the unwind
+    assert e._phase3(arm, m, 1, now) is None                # 1 / (10% x 0.01/s) = 1000s, x5 = 5000s < 48h
+    assert e._phase3(arm, m, 40, now) == REDUCE_ONLY        # 40 -> 200000s > 48h: stop adding
+    e, arm, m = _phase3_engine(tmp_path, 48, 0.0)
+    assert e._phase3(arm, m, 1, now) == REDUCE_ONLY         # no volume: never add to a position
+    e, arm, m = _phase3_engine(tmp_path, 1.5, 864.0)
+    assert e._phase3(arm, m, 0, now) == UNWIND              # inside the last 2h
+
+
+def test_unwind_keeps_its_close_through_a_fair_value_gate(tmp_path):
+    from pmm.trader.position import Fill
+    for hours, expect in ((1.5, (50, 2)), (48, None)):
+        e, arm, m = _phase3_engine(tmp_path / str(hours), hours, 864.0)
+        e.stream.books[m.ticker] = book(yes=((40, 10.0),), no=((50, 10.0),))     # bid 40, ask 50
+        arm.portfolio.position(m.ticker, "weather").add_fill(
+            Fill(ts="2026-11-03T00:00:00Z", ticker=m.ticker, side="yes", action="buy", count=2,
                  price_dollars=0.42, fee_dollars=0.0, order_id="o1"))
-    e._pull(e.mkts[t], 0.0, "fv_gap", e.stream.books[t])
-    plain, aggro = e.arms
-    assert plain.venue.working(t, "sell") is None
-    w = aggro.venue.working(t, "sell")
-    assert w is not None and (w.price_c, w.size) == (50, 2)
+        e._pull(m, 0.0, "fv_gap", e.stream.books[m.ticker])
+        w = arm.venue.working(m.ticker, "sell")
+        assert (None if w is None else (w.price_c, w.size)) == expect      # outside the window: pulled as before
 
 
-def test_phase2_arms_all_carry_the_aggro_close():
+def test_phase3_windows_per_kind():
     from pmm.v2.engine import CRYPTO, CRYPTO_LADDER, NICHE, NICHE_LADDER
-    assert all(a.edge.aggro_close for a in (NICHE, CRYPTO, *NICHE_LADDER, *CRYPTO_LADDER))
+    assert all(a.unwind_s == 7200.0 for a in (NICHE, *NICHE_LADDER))
+    assert all(a.unwind_s == 900.0 for a in (CRYPTO, *CRYPTO_LADDER))
