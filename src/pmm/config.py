@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
-DEFAULT_KEY_DIR = Path.home() / ".midpoint" / ".claude" / "prediction_mm_keys"
+DEFAULT_KEY_DIR = Path.home() / ".config" / "prediction-mm"
 DEFAULT_DATA_DIR = Path.home() / "personal" / "prediction-mm" / "research" / "data"
 
 # Kalshi production base URL. Override with env var KALSHI_BASE_URL if needed.

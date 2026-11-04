@@ -235,6 +235,6 @@ Known live-mode bugs (paper mode is unaffected, but fix before live):
 ## Ground rules
 
 - No API keys in the repo. Ever. `.gitignore` is strict; keys live in
-  `~/.midpoint/.claude/prediction_mm_keys/`.
+  `~/.config/prediction-mm/`.
 - Paper before live. Small before big.
 - Never run with `--live` casually. The prompt exists for a reason.
