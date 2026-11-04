@@ -77,7 +77,7 @@ class ArmConfig:
     unwind_multiple: float = 5.0
 
 
-# Phase 3 (from 2026-11-03): every v2 arm, ladders included. Phases 1-2 are under archive/.
+# Phase 3 (from 2026-11-04): every v2 arm, ladders included. Phases 1-2 are under archive/.
 NICHE = ArmConfig("v2_niche", "niche", EdgeParams(), step_s=2.0, universe_refresh_s=900.0)
 CRYPTO = ArmConfig("v2_crypto", "crypto",
                    EdgeParams(order_size=3, q_max=10, k_base_c=1.0, k_vol=1.0, k_skew_c=2.0,

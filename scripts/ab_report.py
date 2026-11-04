@@ -34,7 +34,7 @@ from pmm.trader.position import Fill, MarketPosition, load_portfolio
 
 DOWNTIME = Path.home() / "personal" / "automation" / "downtime.json"
 PHASE = 3
-PHASE_STARTED = "2026-11-03"
+PHASE_STARTED = "2026-11-04"
 PHASE_RULE = ("every v2 arm quotes normally, goes reduce-only once its position could not be unwound in time "
               "(5x the time to trade it at 10% of the market's 24h volume), and rests what is left at the "
               "touch to close in the last 2 hours (niche) / 15 minutes (hourly crypto)")
