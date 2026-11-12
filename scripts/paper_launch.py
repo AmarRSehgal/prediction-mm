@@ -75,6 +75,9 @@ def guard_baseline_against_sleep(state_path: Path):
 if arm == "baseline":
     if not (WORKTREE / "scripts" / "run_trader.py").exists():
         sys.exit(f"baseline worktree missing: git worktree add --detach {WORKTREE} paper-ab-baseline")
+    # The frozen v1 defaults to the old work machine's key dir; point it at this one's.
+    import os
+    os.environ.setdefault("PMM_KEY_DIR", str(Path.home() / ".config" / "prediction-mm"))
     state = AB / "baseline" / "portfolio.json"
     guard_baseline_against_sleep(state)
     sys.argv = ["run_trader.py", "--state-path", str(state)]

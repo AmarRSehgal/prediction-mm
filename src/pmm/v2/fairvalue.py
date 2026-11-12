@@ -28,8 +28,10 @@ import websockets
 log = logging.getLogger(__name__)
 
 SECONDS_PER_YEAR = 365.25 * 24 * 3600
-BINANCE_WS = "wss://stream.binance.com:9443/stream?streams="
-BINANCE_REST = "https://api.binance.com/api/v3/klines"
+# binance.com geo-blocks US IPs (HTTP 451). The *.binance.vision hosts are Binance's
+# public market-data mirror: same books and klines, no trading, reachable from here.
+BINANCE_WS = "wss://data-stream.binance.vision/stream?streams="
+BINANCE_REST = "https://data-api.binance.vision/api/v3/klines"
 
 
 def norm_cdf(x: float) -> float:
