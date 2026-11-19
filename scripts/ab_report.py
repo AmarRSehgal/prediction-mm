@@ -35,6 +35,10 @@ from pmm.trader.position import Fill, MarketPosition, load_portfolio
 DOWNTIME = Path.home() / "personal" / "automation" / "downtime.json"
 PHASE = 3
 PHASE_STARTED = "2026-11-04"
+# The machine move broke baseline (old key path) and both crypto arms (binance.com 451s US
+# IPs) until 2026-11-12, while niche traded. Those days scored dead arms as $0 and paired
+# niche against nothing, so per-day statistics and comparisons start here instead.
+SCORED_FROM = "2026-11-12"
 PHASE_RULE = ("every v2 arm quotes normally, goes reduce-only once its position could not be unwound in time "
               "(5x the time to trade it at 10% of the market's 24h volume), and rests what is left at the "
               "touch to close in the last 2 hours (niche) / 15 minutes (hourly crypto)")
@@ -83,6 +87,9 @@ CAVEATS = [
     "2 are archived in the repo (archive/phase1/, archive/phase2/) and are not mixed into these numbers.",
     "Days lost to the laptop sleeping are lost for every arm at once, and are excluded from the "
     "per-day statistics rather than scored as zero (automation/downtime.json).",
+    f"Per-day statistics and comparisons count from {SCORED_FROM}, the first day all five arms ran: "
+    f"from {PHASE_STARTED} the baseline and crypto arms were down after the machine move while niche "
+    "traded. Running P&L totals still include niche's earlier days.",
 ]
 
 
@@ -263,6 +270,8 @@ def build(data: Path, client, with_markouts: bool = True, day: str | None = None
     rows = [r for r in rows if r["date"] != today] + [{"date": today, **{a["name"]: a["pnl"] for a in arms}}]
     daily_path.write_text("".join(json.dumps(r) + "\n" for r in rows))
     down = down_dates()
+    unscored = {r["date"] for r in rows if r["date"] < SCORED_FROM} - down
+    down |= unscored
     deltas = {a: [(r1[a] - r0[a]) for r0, r1 in zip(rows, rows[1:])
                   if a in r0 and a in r1 and r1["date"] not in down] for a in ARMS}
     for a in arms:
@@ -284,7 +293,8 @@ def build(data: Path, client, with_markouts: bool = True, day: str | None = None
     for r in rows:
         daily.append({"date": r["date"], "pnl": {a: round(r[a] - prev.get(a, 0.0), 2) for a in ARMS if a in r},
                       "units": {a: 0 if r["date"] in down else 1 for a in ARMS if a in r},
-                      **({"excluded": "downtime"} if r["date"] in down else {})})
+                      **({"excluded": "before_scoring" if r["date"] in unscored else "downtime"}
+                         if r["date"] in down else {})})
         prev = r
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(),
